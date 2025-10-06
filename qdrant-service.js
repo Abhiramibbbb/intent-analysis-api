@@ -1,191 +1,182 @@
 const { QdrantClient } = require('@qdrant/js-client-rest');
-const { pipeline } = require('@xenova/transformers');
+const { pipeline } = require('@huggingface/transformers');
 
-// Initialize Qdrant client with API key support for cloud deployment
-const client = new QdrantClient({
-    url: process.env.QDRANT_URL || 'http://localhost:6333',
-    apiKey: process.env.QDRANT_API_KEY || undefined
-});
-
-const COLLECTION_NAME = 'intent_analysis';
-const VECTOR_SIZE = 384; // all-MiniLM-L6-v2 embedding size
-
-let model = null;
-
-async function loadModel() {
-    if (!model) {
-        console.log('Loading sentence transformer model...');
-        model = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
-        console.log('Model loaded successfully');
+class QdrantService {
+    constructor() {
+        this.client = new QdrantClient({
+            url: process.env.QDRANT_URL || 'http://localhost:6333',
+            apiKey: process.env.QDRANT_API_KEY || undefined
+        });
+        this.embedder = null;
+        this.initialized = false;
+        this.collectionName = 'intent_analysis';
     }
-    return model;
-}
 
-async function getEmbedding(text) {
-    const model = await loadModel();
-    const output = await model(text, { pooling: 'mean', normalize: true });
-    return Array.from(output.data);
-}
+    async initialize() {
+        if (this.initialized) return;
 
-async function initialize() {
-    try {
-        console.log('Qdrant service initialized successfully');
-        await loadModel();
-        await ensureCollection();
-    } catch (error) {
-        console.error('Failed to initialize Qdrant service:', error);
-        throw error;
-    }
-}
-
-async function ensureCollection() {
-    try {
-        const collections = await client.getCollections();
-        const exists = collections.collections.some(col => col.name === COLLECTION_NAME);
-        
-        if (!exists) {
-            console.log(`Creating collection: ${COLLECTION_NAME}`);
-            await client.createCollection(COLLECTION_NAME, {
-                vectors: {
-                    size: VECTOR_SIZE,
-                    distance: 'Cosine'
-                }
-            });
-            console.log(`Created collection: ${COLLECTION_NAME}`);
+        try {
+            console.log('Loading sentence transformer model...');
+            this.embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+            console.log('Model loaded successfully');
+            
+            await this.ensureCollection();
+            this.initialized = true;
+            console.log('Qdrant service initialized successfully');
+        } catch (error) {
+            console.error('Failed to initialize Qdrant service:', error);
+            throw error;
         }
-    } catch (error) {
-        console.error('Error ensuring collection:', error);
-        throw error;
     }
-}
 
-async function indexDictionaries(dictionaries) {
-    try {
+    async ensureCollection() {
+        try {
+            const collections = await this.client.getCollections();
+            const exists = collections.collections.some(c => c.name === this.collectionName);
+
+            if (!exists) {
+                await this.client.createCollection(this.collectionName, {
+                    vectors: { size: 384, distance: 'Cosine' },
+                    optimizers_config: { indexing_threshold: 0 }
+                });
+                console.log(`Created collection: ${this.collectionName}`);
+            }
+        } catch (error) {
+            console.error('Error ensuring collection exists:', error);
+            throw error;
+        }
+    }
+
+    async getEmbedding(text) {
+        if (!this.embedder) {
+            throw new Error('Embedder not initialized. Call initialize() first.');
+        }
+        const output = await this.embedder(text, { pooling: 'mean', normalize: true });
+        return Array.from(output.data);
+    }
+
+    async indexDictionaries(dictionaries) {
         console.log('Indexing dictionaries in Qdrant...');
-        
         const points = [];
         let id = 1;
-        
-        // Helper to create points from dictionary
-        const addPoints = (dict, category, isPhrases = false) => {
-            for (const [key, data] of Object.entries(dict)) {
-                if (isPhrases) {
-                    // For phrase dictionaries
-                    for (const phrase of data) {
-                        points.push({
-                            text: phrase,
+
+        const addPoints = async (category, entries, isPhrases = false) => {
+            for (const [key, value] of Object.entries(entries)) {
+                const items = isPhrases ? value : [...value.primary, ...value.synonyms];
+                for (const item of items) {
+                    const embedding = await this.getEmbedding(item);
+                    points.push({
+                        id: id++,
+                        vector: embedding,
+                        payload: {
                             category: category,
-                            value: key
-                        });
-                    }
-                } else {
-                    // For regular dictionaries with primary and synonyms
-                    for (const word of [...data.primary, ...data.synonyms]) {
-                        points.push({
-                            text: word,
-                            category: category,
-                            value: key
-                        });
-                    }
+                            value: key,
+                            text: item,
+                            isPrimary: isPhrases ? false : value.primary.includes(item)
+                        }
+                    });
                 }
             }
         };
-        
-        // Index all dictionaries
-        addPoints(dictionaries.intent, 'intent');
-        addPoints(dictionaries.intentPhrases, 'intent', true);
-        addPoints(dictionaries.action, 'action');
-        addPoints(dictionaries.actionPhrases, 'action', true);
-        addPoints(dictionaries.process, 'process');
-        addPoints(dictionaries.processPhrases, 'process', true);
-        addPoints(dictionaries.filterName, 'filter_name');
-        addPoints(dictionaries.filterNamePhrases, 'filter_name', true);
-        addPoints(dictionaries.filterOperator, 'filter_operator');
-        addPoints(dictionaries.filterOperatorPhrases, 'filter_operator', true);
-        addPoints(dictionaries.filterValue, 'filter_value');
-        addPoints(dictionaries.filterValuePhrases, 'filter_value', true);
-        
-        // Create embeddings and upload in batches
+
+        await addPoints('intent', dictionaries.intent, false);
+        await addPoints('intent', dictionaries.intentPhrases, true);
+        await addPoints('action', dictionaries.action, false);
+        await addPoints('action', dictionaries.actionPhrases, true);
+        await addPoints('process', dictionaries.process, false);
+        await addPoints('process', dictionaries.processPhrases, true);
+        await addPoints('filter_name', dictionaries.filterName, false);
+        await addPoints('filter_name', dictionaries.filterNamePhrases, true);
+        await addPoints('filter_operator', dictionaries.filterOperator, false);
+        await addPoints('filter_operator', dictionaries.filterOperatorPhrases, true);
+
+        for (const [category, patterns] of Object.entries(dictionaries.filterValue)) {
+            const allPatterns = [...patterns.primary, ...patterns.synonyms];
+            for (const pattern of allPatterns) {
+                const embedding = await this.getEmbedding(pattern);
+                points.push({
+                    id: id++,
+                    vector: embedding,
+                    payload: { category: 'filter_value', value: pattern, text: pattern, filterCategory: category, isPrimary: patterns.primary.includes(pattern) }
+                });
+            }
+        }
+
+        for (const [category, phrases] of Object.entries(dictionaries.filterValuePhrases)) {
+            for (const phrase of phrases) {
+                const embedding = await this.getEmbedding(phrase);
+                points.push({
+                    id: id++,
+                    vector: embedding,
+                    payload: { category: 'filter_value', value: phrase, text: phrase, filterCategory: category, isPrimary: false }
+                });
+            }
+        }
+
         const batchSize = 50;
         for (let i = 0; i < points.length; i += batchSize) {
             const batch = points.slice(i, i + batchSize);
-            const qdrantPoints = [];
-            
-            for (const point of batch) {
-                const embedding = await getEmbedding(point.text);
-                qdrantPoints.push({
-                    id: id++,
-                    vector: embedding,
-                    payload: {
-                        text: point.text,
-                        category: point.category,
-                        value: point.value
-                    }
-                });
-            }
-            
-            await client.upsert(COLLECTION_NAME, {
-                wait: true,
-                points: qdrantPoints
-            });
-            
+            await this.client.upsert(this.collectionName, { wait: true, points: batch });
             console.log(`Indexed batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(points.length / batchSize)}`);
         }
-        
+
         console.log(`Successfully indexed ${points.length} entries in Qdrant`);
-    } catch (error) {
-        console.error('Error indexing dictionaries:', error);
-        throw error;
     }
-}
 
-async function searchSimilar(text, category, limit = 10, threshold = 0.7) {
-    try {
-        const embedding = await getEmbedding(text);
-        
-        const searchResult = await client.search(COLLECTION_NAME, {
-            vector: embedding,
-            filter: {
-                must: [
-                    {
-                        key: 'category',
-                        match: { value: category }
-                    }
-                ]
-            },
-            limit: limit,
-            with_payload: true
-        });
-        
-        if (searchResult.length > 0) {
-            const topResult = searchResult[0];
+    async searchSimilar(text, category, limit = 10, scoreThreshold = 0.7) {
+        if (!this.initialized) await this.initialize();
+
+        try {
+            const embedding = await this.getEmbedding(text);
+            const searchResult = await this.client.search(this.collectionName, {
+                vector: embedding,
+                limit: limit,
+                filter: { must: [{ key: 'category', match: { value: category } }] },
+                with_payload: true
+            });
+
+            console.log(`🔍 Qdrant search for "${text}" in "${category}" - found ${searchResult.length} results`);
+            if (searchResult.length > 0) {
+                console.log(`   Top result: ${searchResult[0].payload.value} (score: ${searchResult[0].score.toFixed(3)})`);
+            }
+
+            const filteredResults = searchResult.filter(r => r.score >= scoreThreshold);
+            if (filteredResults.length === 0) return { match: null, score: 0, matches: [] };
+
+            const bestMatch = filteredResults[0];
             return {
-                match: topResult.payload.value,
-                score: topResult.score,
-                text: topResult.payload.text
+                match: bestMatch.payload.value,
+                score: bestMatch.score,
+                text: bestMatch.payload.text,
+                isPrimary: bestMatch.payload.isPrimary,
+                matches: filteredResults.map(r => ({ value: r.payload.value, score: r.score, text: r.payload.text }))
             };
+        } catch (error) {
+            console.error(`Error searching for ${category}:`, error);
+            return { match: null, score: 0, matches: [] };
         }
-        
-        return { match: null, score: 0, text: null };
-    } catch (error) {
-        console.error('Error searching in Qdrant:', error);
-        return { match: null, score: 0, text: null };
+    }
+
+    async clearCollection() {
+        try {
+            await this.client.deleteCollection(this.collectionName);
+            console.log(`Deleted collection: ${this.collectionName}`);
+            await this.ensureCollection();
+            console.log('Collection cleared and recreated');
+        } catch (error) {
+            console.error('Error clearing collection:', error);
+        }
+    }
+
+    async getCollectionInfo() {
+        try {
+            const info = await this.client.getCollection(this.collectionName);
+            return info;
+        } catch (error) {
+            console.error('Error getting collection info:', error);
+            return null;
+        }
     }
 }
 
-async function getCollectionInfo() {
-    try {
-        return await client.getCollection(COLLECTION_NAME);
-    } catch (error) {
-        console.error('Error getting collection info:', error);
-        return null;
-    }
-}
-
-module.exports = {
-    client,
-    initialize,
-    indexDictionaries,
-    searchSimilar,
-    getCollectionInfo
-};
+module.exports = new QdrantService();
