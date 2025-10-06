@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversational UI Intent Analysis</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Conversational UI Intent Analysis</h1>
+            <p class="subtitle">Advanced Natural Language Processing for Intent Detection</p>
+        </header>
+        
+        <main>
+            <!-- Input Section -->
+            <section class="input-section">
+                <div class="input-group">
+                    <label for="userInput" class="input-label">Please enter your sentence:</label>
+                    <div class="input-container">
+                        <input type="text" 
+                               id="userInput" 
+                               class="sentence-input" 
+                               placeholder="e.g., I want to create a new goal" 
+                               maxlength="500"
+                               autocomplete="off">
+                        <span class="char-counter">0/500</span>
+                    </div>
+                    <div class="input-help">
+                        <small>Enter commands like "I want to create objectives", "I need to modify KPIs", "How do I search for goals", etc.</small>
+                    </div>
+                </div>
+                
+                <div class="button-group">
+                    <button id="analyzeBtn" class="btn btn-primary">
+                        <span class="btn-icon">🔍</span>
+                        Analyze
+                    </button>
+                    <button id="proceedBtn" class="btn btn-success" disabled>
+                        <span class="btn-icon">▶️</span>
+                        Proceed
+                    </button>
+                    <button id="clearBtn" class="btn btn-secondary">
+                        <span class="btn-icon">🗑️</span>
+                        Clear
+                    </button>
+                </div>
+            </section>
+            
+            <!-- Loading Indicator -->
+            <div id="loadingIndicator" class="loading-container" style="display: none;">
+                <div class="loading-spinner"></div>
+                <span>Analyzing your request...</span>
+            </div>
+            
+            <!-- Output Section -->
+            <section id="outputSection" class="output-section" style="display: none;">
+                <h2>Analysis Result</h2>
+                <div id="analysisOutput" class="analysis-output">
+                    <!-- Analysis reply will be displayed here -->
+                </div>
+                
+                <!-- Suggestions Section -->
+                <div id="suggestionsSection" class="suggestions-section" style="display: none;">
+                    <h3>💡 Suggestions</h3>
+                    <div id="suggestedAction" class="suggestion-item"></div>
+                    <div id="exampleQuery" class="example-query"></div>
+                </div>
+            </section>
+            
+            <!-- Conversation Logs Section -->
+            <section class="logs-section">
+                <div class="section-header">
+                    <h2>📋 Conversation Logs</h2>
+                    <button id="refreshLogsBtn" class="btn btn-outline">
+                        <span class="btn-icon">🔄</span>
+                        Refresh
+                    </button>
+                </div>
+                
+                <div id="logsContainer" class="logs-container">
+                    <div class="no-logs">
+                        <p>No conversations logged yet. Start by entering a sentence above!</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+        
+        <!-- Footer -->
+        <footer>
+            <p>&copy; 2024 Conversational UI Analysis System | Built with Node.js & jQuery</p>
+        </footer>
+    </div>
+    
+    <!-- Success/Error Messages -->
+    <div id="messageContainer" class="message-container"></div>
+    
+    <!-- Load separate JavaScript file -->
+    <script src="script.js"></script>
+</body>
+</html>
