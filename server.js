@@ -45,7 +45,7 @@ const ACTION_DICTIONARY = {
   },
   'delete record': {
     primary: ['delete record', 'delete'],
-    synonyms: ['remove', 'discard', 'erase', 'purge', 'destroy', 'eliminate', 'clear', 'drop', 'cancel', 'terminate', 'void', 'revoke', 'abolish', 'nullify', 'expunge', 'liquidate', 'obliterate']
+    synonyms: ['remove', 'discard', 'erase', 'purge', 'destroy', 'eliminate', 'clear', 'drop', 'cancel', 'void', 'revoke',  'obliterate']
   }
 };
 
