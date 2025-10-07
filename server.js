@@ -16,36 +16,36 @@ const logs = [];
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
-app.use('/docs', express.static('docs'));  // ← NEW LINE ADDED
+app.use('/docs', express.static('docs'));
 
-// Dictionaries for Clear matches (primary words and synonyms)
+// UPDATED: Dictionaries for Clear matches (Column 1: Synonyms - Single Words)
 const INTENT_DICTIONARY = {
   'menu': {
-    primary: ['i would like to'],
-    synonyms: ['i need to', 'i want to', 'i wish to']
+    primary: ['i would like to', 'i want to', 'i need to', 'i wish to', 'i intend to'],
+    synonyms: []
   },
   'help': {
-    primary: ['how do i'],
-    synonyms: ['show me how', 'how to']
+    primary: ['how do i', 'does the system support', 'is there capability to', 'where can i', "what's the best way to", "what's required to", "what's involved in", 'could you show me', 'can you guide me on', 'can you explain how to'],
+    synonyms: []
   }
 };
 
 const ACTION_DICTIONARY = {
   'create': {
     primary: ['create', 'add'],
-    synonyms: ['enter', 'generate', 'include', 'attach', 'insert']
+    synonyms: ['enter', 'input', 'register', 'insert', 'submit', 'append', 'post', 'start']
   },
   'modify': {
     primary: ['modify', 'update'],
-    synonyms: ['change', 'edit']
+    synonyms: ['edit', 'revise', 'alter', 'amend', 'adjust', 'correct', 'change', 'fix', 'refine']
   },
   'search for': {
     primary: ['search for', 'search'],
-    synonyms: ['retrieve', 'check']
+    synonyms: ['find', 'locate', 'view', 'browse', 'display', 'show', 'list', 'check', 'inspect', 'open', 'access', 'retrieve', 'get', 'load', 'query', 'fetch']
   },
   'delete record': {
     primary: ['delete record', 'delete'],
-    synonyms: ['remove', 'discard']
+    synonyms: ['remove', 'discard', 'erase', 'purge', 'destroy', 'eliminate', 'clear', 'drop', 'cancel', 'terminate', 'void', 'revoke', 'abolish', 'nullify', 'expunge', 'liquidate', 'obliterate']
   }
 };
 
@@ -102,17 +102,17 @@ const PROCESS_REFERENCE_MAPPING = {
   'Key Result Checkin': '/docs/key-result-checkin-help.html'
 };
 
-// Phrase dictionaries for Adequate Clarity matches
+// UPDATED: Phrase dictionaries for Adequate Clarity matches (Column 2: Adaptive Clarity - Programmatic)
 const INTENT_PHRASE_DICTIONARY = {
-  'menu': ['looking to manage', 'trying to access', 'planning to work on'],
-  'help': ['can you explain', 'need assistance with', 'how can i']
+  'menu': ["i'm looking to", "i'm trying to", 'i am preparing to', 'i am planning to', 'i am aiming to', 'i am hoping to', 'i feel ready to'],
+  'help': ['how to', 'does it have', 'show me how to', "what's the way to", 'what steps do i take to', 'how may i', 'how can i', 'could you explain how to', 'can you help me', "i'm looking to understand how to"]
 };
 
 const ACTION_PHRASE_DICTIONARY = {
-  'create': ['set up a new', 'make a new', 'start a'],
-  'modify': ['adjust the', 'revise the', 'alter the'],
-  'search for': ['look for', 'find the', 'query for'],
-  'delete record': ['get rid of', 'remove the', 'erase the']
+  'create': ['add a record', 'enter a new record', 'input new data', 'make a new record', 'make an entry', 'open a new record', 'save new record', 'submit new record', 'insert a record', 'append a record'],
+  'modify': ['edit a record', 'update a record', 'change details', 'revise record', 'alter record', 'amend details', 'adjust details', 'modify record', 'correct record', 'make changes', 'make updates'],
+  'search for': ['search records', 'look up data', 'find records', 'view records', 'open records', 'show records', 'show data', 'display records', 'browse records', 'list records', 'check records', 'inspect records', 'access records', 'retrieve records', 'pull records', 'load records', 'query records', 'fetch records'],
+  'delete record': ['delete record', 'delete entry', 'remove record', 'remove entry', 'discard record', 'discard entry', 'erase record', 'purge record', 'purge entry', 'clear entry', 'drop entry', 'cancel entry', 'terminate entry', 'void entry', 'revoke entry']
 };
 
 const PROCESS_PHRASE_DICTIONARY = {
