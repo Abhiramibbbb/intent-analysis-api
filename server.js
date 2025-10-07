@@ -7,7 +7,7 @@ const qdrantService = require('./qdrant-service');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const SIMILARITY_THRESHOLD = 0.7; // Maintain original threshold
+const SIMILARITY_THRESHOLD = 0.5; // Maintain original threshold
 
 // In-memory logs storage
 const logs = [];
@@ -224,11 +224,11 @@ function programmaticFallback(userInput, category) {
                     }
                 }
             }
-            if (maxScore >= 0.85) break;
+            if (maxScore >= 0.5) break;
         }
         
         // Check phrase dictionary
-        if (maxScore < 0.7 && phraseDict) {
+        if (maxScore < 0.5 && phraseDict) {
             for (const [key, phrases] of Object.entries(phraseDict)) {
                 for (const phrase of phrases) {
                     if (input.includes(phrase.toLowerCase())) {
@@ -239,7 +239,7 @@ function programmaticFallback(userInput, category) {
                         }
                     }
                 }
-                if (maxScore >= 0.7) break;
+                if (maxScore >= 0.5) break;
             }
         }
     };
