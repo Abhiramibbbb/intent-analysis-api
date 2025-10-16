@@ -503,3 +503,271 @@ class ConversationAnalyzer {
   checkHelpRedirect() {
     const intentCategory = this.analysis.intent.value;
     const intentStatus = this.analysis.intent.status;
+    const processValue = this.analysis.process.value;
+    const processStatus = this.analysis.process.status;
+
+    if (intentCategory === 'help' && 
+        (intentStatus === 'Clear' || intentStatus === 'Adequate Clarity') &&
+        (processStatus === 'Clear' || processStatus === 'Adequate Clarity')) {
+      const redirect_url = PROCESS_REFERENCE_MAPPING[processValue];
+      if (redirect_url) {
+        this.analysis.finalAnalysis = `Redirecting to help for ${processValue}.`;
+        this.analysis.proceed_button = false;
+        this.analysis.redirect_flag = true;
+        this.analysis.redirect_url = redirect_url;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  async step3_actionConclusion(userInput) {
+    const input = userInput.toLowerCase().trim();
+    let actionFound = false;
+
+    for (const [action, patterns] of Object.entries(ACTION_DICTIONARY)) {
+      for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
+        if (input.includes(keyword.toLowerCase())) {
+          this.analysis.action = { status: 'Clear', value: action, reply: `Detected action: ${action}` };
+          this.analysis.step3_reply = `Detected action: ${action}`;
+          actionFound = true;
+          break;
+        }
+      }
+      if (actionFound) break;
+    }
+
+    if (!actionFound) {
+      for (const [action, phrases] of Object.entries(ACTION_PHRASE_DICTIONARY)) {
+        for (const phrase of phrases) {
+          if (input.includes(phrase.toLowerCase())) {
+            this.analysis.action = { status: 'Adequate Clarity', value: action, reply: `Detected action: ${action}` };
+            this.analysis.step3_reply = `Detected action: ${action}`;
+            actionFound = true;
+            break;
+          }
+        }
+        if (actionFound) break;
+      }
+    }
+
+    if (!actionFound) {
+      const searchText = extractActionText(input);
+      if (searchText) {
+        const validation_result = await performCircleValidation(searchText, 'action');
+        if (validation_result.matched) {
+          this.analysis.action = { status: validation_result.clarity, value: validation_result.gold_standard, reply: `Detected action: ${validation_result.gold_standard}` };
+          this.analysis.step3_reply = `Detected action: ${validation_result.gold_standard}`;
+          actionFound = true;
+          if (validation_result.variables) {
+            this.analysis.validation_logs.push({ component_type: 'action', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'ACCEPTED' });
+          }
+        } else if (validation_result.variables) {
+          this.analysis.validation_logs.push({ component_type: 'action', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'REJECTED' });
+        }
+      }
+    }
+
+    if (!actionFound) {
+      this.analysis.action = { status: 'Not Found', value: '', reply: 'No action detected.' };
+      this.analysis.step3_reply = 'No action detected.';
+    }
+  }
+
+  async step4_filterAnalysis(userInput) {
+    const input = userInput.toLowerCase().trim();
+    const intentCategory = this.analysis.intent.value;
+    const actionValue = this.analysis.action.value;
+
+    if (intentCategory !== 'menu' || (actionValue !== 'modify' && actionValue !== 'search')) {
+      this.analysis.filters = { status: 'Not Applicable', value: [], reply: 'Filters not applicable.' };
+      this.analysis.step4_reply = 'Filters not applicable.';
+      return;
+    }
+
+    const detectedFilters = [];
+    for (const pattern of FILTER_PATTERNS) {
+      let match;
+      while ((match = pattern.exec(input)) !== null) {
+        const filterName = match[1] || match[4];
+        const operator = match[2] || match[5] || '=';
+        const value = match[3] || match[6];
+        
+        if (filterName && value) {
+          detectedFilters.push({
+            name: filterName.toLowerCase(),
+            operator: operator.toLowerCase(),
+            value: value.toLowerCase(),
+            name_status: 'Not Found',
+            operator_status: 'Not Found',
+            value_status: 'Not Found'
+          });
+        }
+      }
+    }
+
+    if (detectedFilters.length === 0) {
+      this.analysis.filters = { status: 'Not Found', value: [], reply: 'No filters detected.' };
+      this.analysis.step4_reply = 'No filters detected.';
+      return;
+    }
+
+    for (let i = 0; i < detectedFilters.length; i++) {
+      const filter = detectedFilters[i];
+      await this.analyzeFilterComponent(filter, 'name', 'filter_name', FILTER_NAME_DICTIONARY, FILTER_NAME_PHRASE_DICTIONARY);
+      await this.analyzeFilterComponent(filter, 'operator', 'filter_operator', FILTER_OPERATOR_DICTIONARY, FILTER_OPERATOR_PHRASE_DICTIONARY);
+      await this.analyzeFilterComponent(filter, 'value', 'filter_value', FILTER_VALUE_DICTIONARY, FILTER_VALUE_PHRASE_DICTIONARY);
+    }
+
+    this.analysis.filters.value = detectedFilters;
+    
+    const allClear = detectedFilters.every(f => 
+      f.name_status === 'Clear' && f.operator_status === 'Clear' && f.value_status === 'Clear'
+    );
+    
+    const someValid = detectedFilters.some(f => 
+      f.name_status === 'Clear' || f.name_status === 'Adequate Clarity' ||
+      f.operator_status === 'Clear' || f.operator_status === 'Adequate Clarity' ||
+      f.value_status === 'Clear' || f.value_status === 'Adequate Clarity'
+    );
+
+    if (allClear) {
+      this.analysis.filters.status = 'Clear';
+      this.analysis.filters.reply = 'Filters are clear.';
+      this.analysis.step4_reply = 'Filters are clear.';
+    } else if (someValid) {
+      this.analysis.filters.status = 'Adequate Clarity';
+      this.analysis.filters.reply = 'Filters have adequate clarity.';
+      this.analysis.step4_reply = 'Filters have adequate clarity.';
+    } else {
+      this.analysis.filters.status = 'Not Clear';
+      this.analysis.filters.reply = 'Filters are not clear.';
+      this.analysis.step4_reply = 'Filters are not clear.';
+    }
+  }
+
+  async analyzeFilterComponent(filter, componentKey, category, dictionary, phraseDictionary) {
+    const componentValue = filter[componentKey];
+    const statusKey = `${componentKey}_status`;
+    let found = false;
+
+    for (const [standardValue, patterns] of Object.entries(dictionary)) {
+      for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
+        if (componentValue === keyword.toLowerCase() || componentValue.includes(keyword.toLowerCase())) {
+          filter[statusKey] = 'Clear';
+          filter[componentKey] = standardValue;
+          found = true;
+          break;
+        }
+      }
+      if (found) break;
+    }
+
+    if (!found && phraseDictionary) {
+      for (const [standardValue, phrases] of Object.entries(phraseDictionary)) {
+        for (const phrase of phrases) {
+          if (componentValue.includes(phrase.toLowerCase())) {
+            filter[statusKey] = 'Adequate Clarity';
+            filter[componentKey] = standardValue;
+            found = true;
+            break;
+          }
+        }
+        if (found) break;
+      }
+    }
+
+    if (!found) {
+      const validation_result = await performCircleValidation(componentValue, category);
+
+      if (validation_result.matched) {
+        filter[statusKey] = validation_result.clarity;
+        filter[componentKey] = validation_result.gold_standard;
+        found = true;
+        if (validation_result.variables) {
+          this.analysis.validation_logs.push({
+            component_type: category, ...validation_result.variables,
+            validation_path: validation_result.validation_path, acceptance_status: 'ACCEPTED'
+          });
+        }
+      } else if (validation_result.variables) {
+        this.analysis.validation_logs.push({
+          component_type: category, ...validation_result.variables,
+          validation_path: validation_result.validation_path, acceptance_status: 'REJECTED'
+        });
+      }
+    }
+
+    if (!found) {
+      filter[statusKey] = 'Not Clear';
+    }
+  }
+
+  step5_finalAnalysis() {
+    const intentStatus = this.analysis.intent.status;
+    const processStatus = this.analysis.process.status;
+    const actionStatus = this.analysis.action.status;
+    const filterStatus = this.analysis.filters.status;
+
+    const intentValue = this.analysis.intent.value;
+    const processValue = this.analysis.process.value;
+    const actionValue = this.analysis.action.value;
+
+    const allValid = 
+      (intentStatus === 'Clear' || intentStatus === 'Adequate Clarity') &&
+      (processStatus === 'Clear' || processStatus === 'Adequate Clarity') &&
+      (actionStatus === 'Clear' || actionStatus === 'Adequate Clarity') &&
+      (filterStatus === 'Clear' || filterStatus === 'Adequate Clarity' || filterStatus === 'Not Applicable' || filterStatus === 'Not Found');
+
+    if (allValid) {
+      let filterText = '';
+      if (filterStatus === 'Clear' || filterStatus === 'Adequate Clarity') {
+        const filterDescriptions = this.analysis.filters.value.map(f => 
+          `${f.name} ${f.operator} ${f.value}`
+        ).join(', ');
+        filterText = ` with filters: ${filterDescriptions}`;
+      }
+
+      this.analysis.finalAnalysis = `Your intent is clear to ${actionValue} on ${processValue}${filterText}.`;
+      this.analysis.proceed_button = true;
+    } else {
+      let failures = [];
+      if (intentStatus !== 'Clear' && intentStatus !== 'Adequate Clarity') failures.push('intent');
+      if (processStatus !== 'Clear' && processStatus !== 'Adequate Clarity') failures.push('process');
+      if (actionStatus !== 'Clear' && actionStatus !== 'Adequate Clarity') failures.push('action');
+      if (filterStatus === 'Not Clear') failures.push('filters');
+
+      this.analysis.finalAnalysis = `Unable to determine: ${failures.join(', ')}.`;
+      this.analysis.proceed_button = false;
+
+      if (intentValue === 'menu') {
+        this.analysis.suggested_action = 'Please rephrase using: create, modify, search, or delete.';
+        this.analysis.example_query = 'Example: "I want to create an objective"';
+      } else if (intentValue === 'help') {
+        this.analysis.suggested_action = 'Please specify what you need help with.';
+        this.analysis.example_query = 'Example: "How do I create an objective?"';
+      } else {
+        this.analysis.suggested_action = 'Please rephrase your request more clearly.';
+        this.analysis.example_query = 'Example: "I want to create an objective"';
+      }
+    }
+  }
+
+  async analyze(userInput) {
+    this.reset();
+    this.analysis.userInput = userInput;
+
+    await this.step1_intentConclusion(userInput);
+    await this.step2_processConclusion(userInput);
+
+    if (this.checkHelpRedirect()) {
+      return this.analysis;
+    }
+
+    await this.step3_actionConclusion(userInput);
+    await this.step4_filterAnalysis(userInput);
+    this.step5_finalAnalysis();
+
+    return this.analysis;
+  }
+}
