@@ -34,6 +34,10 @@
             font-size: 2.5rem;
             margin-bottom: 40px;
             font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
         }
 
         .query-section {
@@ -52,6 +56,14 @@
             display: flex;
             align-items: center;
             gap: 10px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #4a5568;
+            font-weight: 500;
         }
 
         textarea {
@@ -139,8 +151,8 @@
 
         .analysis-result {
             padding: 20px;
-            background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);
-            border-left: 4px solid #667eea;
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-left: 4px solid #f59e0b;
             border-radius: 10px;
             margin-bottom: 25px;
         }
@@ -187,6 +199,7 @@
             padding: 10px 20px;
             border-radius: 8px;
             font-size: 14px;
+            flex: none;
         }
 
         .refresh-btn:hover {
@@ -234,18 +247,18 @@
 
         <div class="query-section">
             <div class="section-title">📝 Enter Your Query</div>
-            <label for="userInput" style="display: block; margin-bottom: 10px; font-size: 14px; color: #4a5568;">
-                Input Sentence
+            <label for="userInput">
+                Please enter your sentence:
             </label>
             <textarea 
                 id="userInput" 
-                placeholder="Type your sentence here... (e.g., 'I want to create an objective')"
+                placeholder="Enter commands like &quot;I want to create objectives&quot;, &quot;I need to modify KPIs&quot;, &quot;How do I search for goals&quot;, etc."
             ></textarea>
-            <div class="char-count">Character count: <span id="charCount">0</span>/500</div>
+            <div class="char-count"><span id="charCount">0</span>/500</div>
 
             <div class="button-group">
                 <button class="analyze-btn" onclick="analyzeIntent()">
-                    🔍 Analyze Intent
+                    🔍 Analyze
                 </button>
                 <button class="proceed-btn" id="proceedBtn" style="display:none;">
                     ➡️ Proceed
@@ -283,7 +296,7 @@
 
         <div class="history-section">
             <div class="history-header">
-                <div class="section-title">📜 Analysis History</div>
+                <div class="section-title">📜 Conversation Logs</div>
                 <button class="refresh-btn" onclick="loadAnalysisHistory()">
                     🔄 Refresh
                 </button>
@@ -294,15 +307,15 @@
                     <thead>
                         <tr>
                             <th>ID</th>
-                            <th>INTENT</th>
-                            <th>PROCESS</th>
-                            <th>ACTION</th>
-                            <th>FILTERS</th>
-                            <th>FINAL ANALYSIS</th>
-                            <th>SUGGESTED ACTION</th>
-                            <th>EXAMPLE QUERY</th>
-                            <th>PROCEED</th>
-                            <th>TIMESTAMP</th>
+                            <th>Intent</th>
+                            <th>Process</th>
+                            <th>Action</th>
+                            <th>Filters</th>
+                            <th>Final Analysis</th>
+                            <th>Suggested Action</th>
+                            <th>Example Query</th>
+                            <th>Proceed</th>
+                            <th>Timestamp</th>
                         </tr>
                     </thead>
                     <tbody id="historyBody">
@@ -356,7 +369,7 @@
                 const data = await response.json();
                 displayResults(data);
 
-                // ✅ ADDED: Auto-refresh history after analysis
+                // Auto-refresh history after analysis
                 await loadAnalysisHistory();
 
             } catch (error) {
@@ -381,21 +394,21 @@
                     <p style="margin-top: 10px; line-height: 1.6;">${data.analysis || data.message || 'Analysis completed'}</p>
                 </div>
                 ${data.suggestion ? `
-                    <div style="margin-top: 15px; padding: 12px; background: #fef5e7; border-left: 3px solid #f39c12; border-radius: 5px;">
+                    <div style="margin-top: 15px; padding: 12px; background: #e0f2fe; border-left: 3px solid #0284c7; border-radius: 5px;">
                         <strong>💡 Suggestion:</strong> ${data.suggestion}
                     </div>
                 ` : ''}
                 ${data.example ? `
-                    <div style="margin-top: 15px; padding: 12px; background: #e8f5e9; border-left: 3px solid #4caf50; border-radius: 5px;">
+                    <div style="margin-top: 15px; padding: 12px; background: #dcfce7; border-left: 3px solid #16a34a; border-radius: 5px;">
                         <strong>📝 Example:</strong> ${data.example}
                     </div>
                 ` : ''}
             `;
 
-            intentDetail.textContent = `${data.intent?.status || 'Unknown'} (${data.intent?.category || 'N/A'})`;
-            processDetail.textContent = `${data.process?.status || 'Unknown'} (${data.process?.detected || 'N/A'})`;
-            actionDetail.textContent = `${data.action?.status || 'Unknown'} (${data.action?.detected || 'N/A'})`;
-            filtersDetail.textContent = data.filters?.status || 'Not Applicable';
+            intentDetail.textContent = data.intent ? `${data.intent.status || 'Unknown'} (${data.intent.category || 'N/A'})` : 'Unknown';
+            processDetail.textContent = data.process ? `${data.process.status || 'Unknown'} (${data.process.detected || 'N/A'})` : 'Unknown';
+            actionDetail.textContent = data.action ? `${data.action.status || 'Unknown'} (${data.action.detected || 'N/A'})` : 'Unknown';
+            filtersDetail.textContent = data.filters ? (data.filters.status || 'Not Applicable') : 'Not Applicable';
 
             proceedBtn.style.display = data.proceedButton ? 'flex' : 'none';
 
@@ -457,7 +470,7 @@
             document.getElementById('proceedBtn').style.display = 'none';
         }
 
-        // ✅ ADDED: Load history on page load
+        // Load history on page load
         window.addEventListener('load', loadAnalysisHistory);
     </script>
 </body>
