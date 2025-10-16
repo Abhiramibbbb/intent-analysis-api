@@ -173,7 +173,7 @@ const FILTER_PATTERNS = [
   /for\s+(quarter|q)\s*(q?[1-4])/gi
 ];
 
-// Helper Functions
+// ========== HELPER FUNCTIONS ==========
 function extractIntentText(userInput) {
   const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find'];
   for (const verb of actionVerbs) {
@@ -211,7 +211,7 @@ function extractActionText(userInput) {
   return '';
 }
 
-// SEQUENTIAL CIRCLE VALIDATION FUNCTION (with 4 Variables)
+// ========== SEQUENTIAL CIRCLE VALIDATION FUNCTION ==========
 async function performCircleValidation(searchText, category) {
   const categoryMap = {
     'intent': 'intent', 'process': 'process', 'action': 'action',
@@ -219,21 +219,39 @@ async function performCircleValidation(searchText, category) {
   };
 
   const qdrantCategory = categoryMap[category] || category;
+  
+  console.log(`\n[Qdrant] ==================== VALIDATION START ====================`);
+  console.log(`[Qdrant] Search Text: "${searchText}"`);
+  console.log(`[Qdrant] Category: ${qdrantCategory}`);
 
   try {
+    console.log(`[Qdrant] Calling searchSimilar...`);
     const results = await qdrantService.searchSimilar(searchText, qdrantCategory, 10, 0.0);
+    
+    console.log(`[Qdrant] Raw Results:`, JSON.stringify(results, null, 2));
 
     if (!results || !results.match) {
+      console.log(`[Qdrant] No match found`);
+      console.log(`[Qdrant] ==================== VALIDATION END (NO MATCH) ====================\n`);
       return { matched: false, gold_standard: null, clarity: null, variables: null, validation_path: 'NONE' };
     }
 
     const gold_standard = results.match;
     const new_to_gold_score = results.score;
+    
+    console.log(`\n[Qdrant] Best Match Found:`);
+    console.log(`   Gold Standard: "${gold_standard}"`);
+    console.log(`   Similarity Score: ${new_to_gold_score.toFixed(4)}`);
+    console.log(`   Distance to Gold: ${(1.0 - new_to_gold_score).toFixed(4)}`);
 
-    // CONDITION 1: Safety Floor Check
+    // CHECK 1: Safety Floor
+    console.log(`\n[Qdrant] CHECK 1: Safety Floor (${SAFETY_FLOOR})`);
     if (new_to_gold_score < SAFETY_FLOOR) {
+      console.log(`   FAILED: Score ${new_to_gold_score.toFixed(4)} < ${SAFETY_FLOOR}`);
+      console.log(`[Qdrant] ==================== VALIDATION END (SAFETY FLOOR) ====================\n`);
       return { matched: false, gold_standard, clarity: null, variables: null, validation_path: 'NONE' };
     }
+    console.log(`   PASSED: Score ${new_to_gold_score.toFixed(4)} >= ${SAFETY_FLOOR}`);
 
     const variables = {
       variable1_new_value: searchText,
@@ -246,55 +264,90 @@ async function performCircleValidation(searchText, category) {
     const ref2_phrase = REFERENCE_MAPPINGS[qdrantCategory]?.ref2[gold_standard];
 
     if (!ref1_phrase || !ref2_phrase) {
+      console.log(`[Qdrant] Reference phrases not found for "${gold_standard}"`);
+      console.log(`[Qdrant] ==================== VALIDATION END (NO REF) ====================\n`);
       return { matched: false, gold_standard, clarity: null, variables: null, validation_path: 'NONE' };
     }
 
-    // CHECK 1: Distance to Gold Standard
+    console.log(`\n[Qdrant] Reference Phrases:`);
+    console.log(`   Ref1: "${ref1_phrase}"`);
+    console.log(`   Ref2: "${ref2_phrase}"`);
+
+    // CHECK 2: Distance to Gold Standard
+    console.log(`\n[Qdrant] CHECK 2: Distance to Gold (< ${MAX_DISTANCE_TO_GOLD})`);
+    console.log(`   Distance: ${variables.variable2_distance_to_gold.toFixed(4)}`);
+    
     if (variables.variable2_distance_to_gold < MAX_DISTANCE_TO_GOLD) {
+      console.log(`   PASSED: ${variables.variable2_distance_to_gold.toFixed(4)} < ${MAX_DISTANCE_TO_GOLD}`);
+      console.log(`[Qdrant] VALIDATION SUCCESSFUL via GOLD path`);
+      console.log(`[Qdrant] ==================== VALIDATION END (GOLD) ====================\n`);
       return {
         matched: true, gold_standard, clarity: 'Adequate Clarity',
         variables: { ...variables, variable3_distance_to_ref1: null, variable4_distance_to_ref2: null },
         validation_path: 'GOLD'
       };
     }
+    console.log(`   FAILED: ${variables.variable2_distance_to_gold.toFixed(4)} >= ${MAX_DISTANCE_TO_GOLD}`);
 
-    // CHECK 2: Distance to Reference 1
+    // CHECK 3: Distance to Reference 1
+    console.log(`\n[Qdrant] CHECK 3: Distance to Ref1 (< ${MAX_DISTANCE_TO_REF1})`);
     const ref1_results = await qdrantService.searchSimilar(ref1_phrase, qdrantCategory, 10, 0.0);
     const new_to_ref1_score = ref1_results.score || 0;
     const gold_to_ref1_score = GOLD_TO_REF1_SCORES[qdrantCategory]?.[gold_standard] || 0;
     variables.variable3_distance_to_ref1 = Math.abs(new_to_ref1_score - gold_to_ref1_score);
 
+    console.log(`   New → Ref1 Score: ${new_to_ref1_score.toFixed(4)}`);
+    console.log(`   Gold → Ref1 Score: ${gold_to_ref1_score.toFixed(4)}`);
+    console.log(`   Distance (diff): ${variables.variable3_distance_to_ref1.toFixed(4)}`);
+
     if (variables.variable3_distance_to_ref1 < MAX_DISTANCE_TO_REF1) {
+      console.log(`   PASSED: ${variables.variable3_distance_to_ref1.toFixed(4)} < ${MAX_DISTANCE_TO_REF1}`);
+      console.log(`[Qdrant] VALIDATION SUCCESSFUL via REF1 path`);
+      console.log(`[Qdrant] ==================== VALIDATION END (REF1) ====================\n`);
       return {
         matched: true, gold_standard, clarity: 'Adequate Clarity',
         variables: { ...variables, variable4_distance_to_ref2: null },
         validation_path: 'REF1'
       };
     }
+    console.log(`   FAILED: ${variables.variable3_distance_to_ref1.toFixed(4)} >= ${MAX_DISTANCE_TO_REF1}`);
 
-    // CHECK 3: Distance to Reference 2
+    // CHECK 4: Distance to Reference 2
+    console.log(`\n[Qdrant] CHECK 4: Distance to Ref2 (< ${MAX_DISTANCE_TO_REF2})`);
     const ref2_results = await qdrantService.searchSimilar(ref2_phrase, qdrantCategory, 10, 0.0);
     const new_to_ref2_score = ref2_results.score || 0;
     const gold_to_ref2_score = GOLD_TO_REF2_SCORES[qdrantCategory]?.[gold_standard] || 0;
     variables.variable4_distance_to_ref2 = Math.abs(new_to_ref2_score - gold_to_ref2_score);
 
+    console.log(`   New → Ref2 Score: ${new_to_ref2_score.toFixed(4)}`);
+    console.log(`   Gold → Ref2 Score: ${gold_to_ref2_score.toFixed(4)}`);
+    console.log(`   Distance (diff): ${variables.variable4_distance_to_ref2.toFixed(4)}`);
+
     if (variables.variable4_distance_to_ref2 < MAX_DISTANCE_TO_REF2) {
+      console.log(`   PASSED: ${variables.variable4_distance_to_ref2.toFixed(4)} < ${MAX_DISTANCE_TO_REF2}`);
+      console.log(`[Qdrant] VALIDATION SUCCESSFUL via REF2 path`);
+      console.log(`[Qdrant] ==================== VALIDATION END (REF2) ====================\n`);
       return {
         matched: true, gold_standard, clarity: 'Adequate Clarity',
         variables,
         validation_path: 'REF2'
       };
     }
+    console.log(`   FAILED: ${variables.variable4_distance_to_ref2.toFixed(4)} >= ${MAX_DISTANCE_TO_REF2}`);
 
+    console.log(`\n[Qdrant] All validation checks failed`);
+    console.log(`[Qdrant] ==================== VALIDATION END (ALL FAILED) ====================\n`);
     return { matched: false, gold_standard, clarity: null, variables, validation_path: 'NONE' };
 
   } catch (error) {
-    console.error(`Validation error: ${error.message}`);
+    console.error(`[Qdrant] Validation error:`, error.message);
+    console.error(`Stack:`, error.stack);
+    console.log(`[Qdrant] ==================== VALIDATION END (ERROR) ====================\n`);
     return { matched: false, gold_standard: null, clarity: null, variables: null, validation_path: 'NONE' };
   }
 }
 
-// Conversation Analyzer Class
+// ========== CONVERSATION ANALYZER CLASS ==========
 class ConversationAnalyzer {
   constructor() {
     this.reset();
@@ -334,7 +387,6 @@ class ConversationAnalyzer {
     const input = userInput.toLowerCase().trim();
     let intentFound = false;
 
-    // 1.1 Programmatic Check (Primary/Synonym)
     for (const [intent, patterns] of Object.entries(INTENT_DICTIONARY)) {
       for (const pattern of [...patterns.primary, ...patterns.synonyms]) {
         if (input.includes(pattern.toLowerCase())) {
@@ -347,7 +399,6 @@ class ConversationAnalyzer {
       if (intentFound) break;
     }
 
-    // 1.2 Programmatic Check (Phrase Dictionary)
     if (!intentFound) {
       for (const [intent, phrases] of Object.entries(INTENT_PHRASE_DICTIONARY)) {
         for (const phrase of phrases) {
@@ -362,7 +413,6 @@ class ConversationAnalyzer {
       }
     }
 
-    // 1.3 Qdrant Vector Similarity Search (Sequential Circle Validation)
     if (!intentFound) {
       const searchText = extractIntentText(input);
       const validation_result = await performCircleValidation(searchText, 'intent');
@@ -386,7 +436,6 @@ class ConversationAnalyzer {
       }
     }
 
-    // 1.4 No Intent Detected
     if (!intentFound) {
       if (this.hasAnyKeywords(input)) {
         this.analysis.intent = { status: 'Not Clear', value: '', reply: 'Unable to determine your intent.' };
@@ -402,7 +451,6 @@ class ConversationAnalyzer {
     const input = userInput.toLowerCase().trim();
     let processFound = false;
 
-    // 2.1 Programmatic Check (Primary/Synonym)
     for (const [process, patterns] of Object.entries(PROCESS_DICTIONARY)) {
       for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
         if (input === keyword.toLowerCase() || input.includes(keyword.toLowerCase())) {
@@ -415,7 +463,6 @@ class ConversationAnalyzer {
       if (processFound) break;
     }
 
-    // 2.2 Programmatic Check (Phrase Dictionary)
     if (!processFound) {
       for (const [process, phrases] of Object.entries(PROCESS_PHRASE_DICTIONARY)) {
         for (const phrase of phrases) {
@@ -430,7 +477,6 @@ class ConversationAnalyzer {
       }
     }
 
-    // 2.3 Qdrant Vector Similarity Search (Sequential Circle Validation)
     if (!processFound) {
       const searchText = extractProcessText(input);
       if (searchText) {
@@ -448,14 +494,12 @@ class ConversationAnalyzer {
       }
     }
 
-    // 2.4 No Process Detected
     if (!processFound) {
       this.analysis.process = { status: 'Not Found', value: '', reply: 'No process detected.' };
       this.analysis.step2_reply = 'No process detected.';
     }
   }
 
-  // 2.5 Help Intent Redirect Check
   checkHelpRedirect() {
     const intentCategory = this.analysis.intent.value;
     const intentStatus = this.analysis.intent.status;
@@ -481,7 +525,6 @@ class ConversationAnalyzer {
     const input = userInput.toLowerCase().trim();
     let actionFound = false;
 
-    // 3.1 Programmatic Check (Primary/Synonym)
     for (const [action, patterns] of Object.entries(ACTION_DICTIONARY)) {
       for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
         if (input.includes(keyword.toLowerCase())) {
@@ -494,7 +537,6 @@ class ConversationAnalyzer {
       if (actionFound) break;
     }
 
-    // 3.2 Programmatic Check (Phrase Dictionary)
     if (!actionFound) {
       for (const [action, phrases] of Object.entries(ACTION_PHRASE_DICTIONARY)) {
         for (const phrase of phrases) {
@@ -509,7 +551,6 @@ class ConversationAnalyzer {
       }
     }
 
-    // 3.3 Qdrant Vector Similarity Search (Sequential Circle Validation)
     if (!actionFound) {
       const searchText = extractActionText(input);
       if (searchText) {
@@ -527,7 +568,6 @@ class ConversationAnalyzer {
       }
     }
 
-    // 3.4 No Action Detected
     if (!actionFound) {
       this.analysis.action = { status: 'Not Found', value: '', reply: 'No action detected.' };
       this.analysis.step3_reply = 'No action detected.';
@@ -539,14 +579,12 @@ class ConversationAnalyzer {
     const intentCategory = this.analysis.intent.value;
     const actionValue = this.analysis.action.value;
 
-    // 4.1 Check Filter Applicability
     if (intentCategory !== 'menu' || (actionValue !== 'modify' && actionValue !== 'search')) {
       this.analysis.filters = { status: 'Not Applicable', value: [], reply: 'Filters not applicable.' };
       this.analysis.step4_reply = 'Filters not applicable.';
       return;
     }
 
-    // 4.2 Detect Filters Using Regex Patterns
     const detectedFilters = [];
     for (const pattern of FILTER_PATTERNS) {
       let match;
@@ -574,7 +612,6 @@ class ConversationAnalyzer {
       return;
     }
 
-    // Process each filter
     for (let i = 0; i < detectedFilters.length; i++) {
       const filter = detectedFilters[i];
       await this.analyzeFilterComponent(filter, 'name', 'filter_name', FILTER_NAME_DICTIONARY, FILTER_NAME_PHRASE_DICTIONARY);
@@ -614,7 +651,6 @@ class ConversationAnalyzer {
     const statusKey = `${componentKey}_status`;
     let found = false;
 
-    // Programmatic Check (Primary/Synonym)
     for (const [standardValue, patterns] of Object.entries(dictionary)) {
       for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
         if (componentValue === keyword.toLowerCase() || componentValue.includes(keyword.toLowerCase())) {
@@ -627,7 +663,6 @@ class ConversationAnalyzer {
       if (found) break;
     }
 
-    // Programmatic Check (Phrase Dictionary)
     if (!found && phraseDictionary) {
       for (const [standardValue, phrases] of Object.entries(phraseDictionary)) {
         for (const phrase of phrases) {
@@ -642,7 +677,6 @@ class ConversationAnalyzer {
       }
     }
 
-    // Qdrant Circle Validation (Sequential)
     if (!found) {
       const validation_result = await performCircleValidation(componentValue, category);
 
@@ -738,13 +772,13 @@ class ConversationAnalyzer {
   }
 }
 
-// ========== NEW: REQUEST LOGGING MIDDLEWARE ==========
+// ========== REQUEST LOGGING MIDDLEWARE ==========
 app.use((req, res, next) => {
   console.log(`📍 ${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
 
-// ========== NEW: HEALTH CHECK ENDPOINT ==========
+// ========== HEALTH CHECK ENDPOINT ==========
 app.get('/health', (req, res) => {
   console.log('✅ Health check accessed');
   res.status(200).json({ 
@@ -756,9 +790,37 @@ app.get('/health', (req, res) => {
   });
 });
 
-// ========== API ENDPOINTS ==========
+// ========== QDRANT STATUS DIAGNOSTIC ENDPOINT ==========
+app.get('/qdrant-status', async (req, res) => {
+  console.log('🔍 Checking Qdrant status...');
+  try {
+    const info = await qdrantService.getCollectionInfo();
+    res.json({
+      success: true,
+      initialized: qdrantService.initialized,
+      collection_exists: info !== null,
+      collection_info: info,
+      environment: {
+        qdrant_url_set: !!process.env.QDRANT_URL,
+        qdrant_api_key_set: !!process.env.QDRANT_API_KEY,
+        qdrant_url: process.env.QDRANT_URL || 'NOT SET'
+      }
+    });
+  } catch (error) {
+    console.error('❌ Qdrant status check failed:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      initialized: qdrantService.initialized,
+      environment: {
+        qdrant_url_set: !!process.env.QDRANT_URL,
+        qdrant_api_key_set: !!process.env.QDRANT_API_KEY
+      }
+    });
+  }
+});
 
-// NEW: Backward compatibility for /analyze endpoint
+// ========== API ENDPOINTS ==========
 app.post('/analyze', async (req, res) => {
   console.log('📥 /analyze endpoint called (backward compatibility)');
   try {
@@ -798,7 +860,6 @@ app.post('/analyze', async (req, res) => {
   }
 });
 
-// Original /api/analyze endpoint
 app.post('/api/analyze', async (req, res) => {
   console.log('📥 /api/analyze endpoint called');
   try {
@@ -885,6 +946,7 @@ app.listen(PORT, async () => {
     console.log(`${'='.repeat(80)}\n`);
     console.log(`🚀 Server is ready and listening on port ${PORT}`);
     console.log(`📍 Health check: http://localhost:${PORT}/health`);
+    console.log(`📍 Qdrant status: http://localhost:${PORT}/qdrant-status`);
     console.log(`📍 API endpoint: http://localhost:${PORT}/analyze`);
     console.log(`${'='.repeat(80)}\n`);
   } catch (error) {
