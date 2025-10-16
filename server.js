@@ -69,6 +69,45 @@ const GOLD_TO_REF2_SCORES = {
   filter_value: { 'today': 0.8571, 'high': 0.7103, 'pending': 0.5231, 'q1': 0.3022 }
 };
 
+// Category to Gold Standard Phrase Mapping
+const CATEGORY_TO_GOLD_PHRASE = {
+  'intent': {
+    'menu': 'i want to',
+    'help': 'how do i'
+  },
+  'process': {
+    'objective': 'objective',
+    'key result': 'key result',
+    'initiative': 'initiative',
+    'review meeting': 'review meeting',
+    'key result checkin': 'key result checkin'
+  },
+  'action': {
+    'create': 'create',
+    'modify': 'modify',
+    'search': 'search',
+    'delete': 'delete'
+  },
+  'filter_name': {
+    'due': 'due',
+    'priority': 'priority',
+    'status': 'status',
+    'assigned': 'assigned',
+    'quarter': 'quarter'
+  },
+  'filter_operator': {
+    'equal to': 'equal to',
+    'greater than': 'greater than',
+    'less than': 'less than'
+  },
+  'filter_value': {
+    'today': 'today',
+    'high': 'high',
+    'pending': 'pending',
+    'q1': 'q1'
+  }
+};
+
 // Dictionaries
 const INTENT_DICTIONARY = {
   'menu': { primary: ['i would like to', 'i want to', 'i need to', 'i wish to', 'i intend to'], synonyms: [] },
@@ -211,27 +250,6 @@ function extractActionText(userInput) {
   return '';
 }
 
-// ========== CATEGORY TO GOLD STANDARD PHRASE MAPPING ==========
-const CATEGORY_TO_GOLD_PHRASE = {
-  'intent': {
-    'menu': 'i want to',
-    'help': 'how do i'
-  },
-  'process': {
-    'objective': 'objective',
-    'key result': 'key result',
-    'initiative': 'initiative',
-    'review meeting': 'review meeting',
-    'key result checkin': 'key result checkin'
-  },
-  'action': {
-    'create': 'create',
-    'modify': 'modify',
-    'search': 'search',
-    'delete': 'delete'
-  }
-};
-
 // ========== SEQUENTIAL CIRCLE VALIDATION FUNCTION ==========
 async function performCircleValidation(searchText, category) {
   const categoryMap = {
@@ -260,16 +278,15 @@ async function performCircleValidation(searchText, category) {
     let categoryResult = results.match;
     const new_to_gold_score = results.score;
 
-    console.log(`[Qdrant] Qdrant returned category: "${categoryResult}"`);
+    console.log(`[Qdrant] Qdrant returned: "${categoryResult}"`);
 
     // STEP 1: Map category name to gold standard phrase if needed
     let gold_standard = categoryResult;
     if (CATEGORY_TO_GOLD_PHRASE[qdrantCategory]?.[categoryResult]) {
       gold_standard = CATEGORY_TO_GOLD_PHRASE[qdrantCategory][categoryResult];
-      console.log(`[Qdrant] Mapped category "${categoryResult}" to gold phrase "${gold_standard}"`);
+      console.log(`[Qdrant] Mapped "${categoryResult}" to gold phrase "${gold_standard}"`);
     } else {
-      gold_standard = categoryResult;
-      console.log(`[Qdrant] No mapping needed, using result as-is: "${gold_standard}"`);
+      console.log(`[Qdrant] Using result as-is: "${gold_standard}"`);
     }
     
     console.log(`\n[Qdrant] Best Match Found:`);
@@ -329,8 +346,8 @@ async function performCircleValidation(searchText, category) {
     const gold_to_ref1_score = GOLD_TO_REF1_SCORES[qdrantCategory]?.[gold_standard] || 0;
     variables.variable3_distance_to_ref1 = Math.abs(new_to_ref1_score - gold_to_ref1_score);
 
-    console.log(`   New → Ref1 Score: ${new_to_ref1_score.toFixed(4)}`);
-    console.log(`   Gold → Ref1 Score: ${gold_to_ref1_score.toFixed(4)}`);
+    console.log(`   New -> Ref1 Score: ${new_to_ref1_score.toFixed(4)}`);
+    console.log(`   Gold -> Ref1 Score: ${gold_to_ref1_score.toFixed(4)}`);
     console.log(`   Distance (diff): ${variables.variable3_distance_to_ref1.toFixed(4)}`);
 
     if (variables.variable3_distance_to_ref1 < MAX_DISTANCE_TO_REF1) {
@@ -352,8 +369,8 @@ async function performCircleValidation(searchText, category) {
     const gold_to_ref2_score = GOLD_TO_REF2_SCORES[qdrantCategory]?.[gold_standard] || 0;
     variables.variable4_distance_to_ref2 = Math.abs(new_to_ref2_score - gold_to_ref2_score);
 
-    console.log(`   New → Ref2 Score: ${new_to_ref2_score.toFixed(4)}`);
-    console.log(`   Gold → Ref2 Score: ${gold_to_ref2_score.toFixed(4)}`);
+    console.log(`   New -> Ref2 Score: ${new_to_ref2_score.toFixed(4)}`);
+    console.log(`   Gold -> Ref2 Score: ${gold_to_ref2_score.toFixed(4)}`);
     console.log(`   Distance (diff): ${variables.variable4_distance_to_ref2.toFixed(4)}`);
 
     if (variables.variable4_distance_to_ref2 < MAX_DISTANCE_TO_REF2) {
@@ -420,9 +437,12 @@ class ConversationAnalyzer {
     const input = userInput.toLowerCase().trim();
     let intentFound = false;
 
+    console.log(`\n[STEP1] Intent Detection Start`);
+
     for (const [intent, patterns] of Object.entries(INTENT_DICTIONARY)) {
       for (const pattern of [...patterns.primary, ...patterns.synonyms]) {
         if (input.includes(pattern.toLowerCase())) {
+          console.log(`[STEP1] Primary dictionary match: "${pattern}"`);
           this.analysis.intent = { status: 'Clear', value: intent, reply: 'Your intent is clear.' };
           this.analysis.step1_reply = 'Your intent is clear.';
           intentFound = true;
@@ -433,9 +453,11 @@ class ConversationAnalyzer {
     }
 
     if (!intentFound) {
+      console.log(`[STEP1] Checking phrase dictionary...`);
       for (const [intent, phrases] of Object.entries(INTENT_PHRASE_DICTIONARY)) {
         for (const phrase of phrases) {
           if (input.includes(phrase.toLowerCase())) {
+            console.log(`[STEP1] Phrase dictionary match: "${phrase}"`);
             this.analysis.intent = { status: 'Adequate Clarity', value: intent, reply: 'Your intent seems somewhat clear.' };
             this.analysis.step1_reply = 'Your intent seems somewhat clear.';
             intentFound = true;
@@ -447,11 +469,13 @@ class ConversationAnalyzer {
     }
 
     if (!intentFound) {
+      console.log(`[STEP1] Attempting Qdrant search...`);
       const searchText = extractIntentText(input);
       const validation_result = await performCircleValidation(searchText, 'intent');
 
       if (validation_result.matched) {
         const detectedIntent = INTENT_PHRASE_TO_CATEGORY[validation_result.gold_standard] || 'menu';
+        console.log(`[STEP1] Qdrant match successful: "${detectedIntent}"`);
         this.analysis.intent = { status: validation_result.clarity, value: detectedIntent, reply: 'Your intent seems somewhat clear.' };
         this.analysis.step1_reply = 'Your intent seems somewhat clear.';
         intentFound = true;
@@ -461,32 +485,42 @@ class ConversationAnalyzer {
             validation_path: validation_result.validation_path, acceptance_status: 'ACCEPTED'
           });
         }
-      } else if (validation_result.variables) {
-        this.analysis.validation_logs.push({
-          component_type: 'intent', ...validation_result.variables,
-          validation_path: validation_result.validation_path, acceptance_status: 'REJECTED'
-        });
+      } else {
+        console.log(`[STEP1] Qdrant validation failed`);
+        if (validation_result.variables) {
+          this.analysis.validation_logs.push({
+            component_type: 'intent', ...validation_result.variables,
+            validation_path: validation_result.validation_path, acceptance_status: 'REJECTED'
+          });
+        }
       }
     }
 
     if (!intentFound) {
       if (this.hasAnyKeywords(input)) {
+        console.log(`[STEP1] Keywords detected but intent unclear`);
         this.analysis.intent = { status: 'Not Clear', value: '', reply: 'Unable to determine your intent.' };
         this.analysis.step1_reply = 'Unable to determine your intent.';
       } else {
+        console.log(`[STEP1] No intent detected`);
         this.analysis.intent = { status: 'Not Found', value: '', reply: 'No intent detected.' };
         this.analysis.step1_reply = 'No intent detected.';
       }
     }
+    
+    console.log(`[STEP1] Result: ${this.analysis.intent.status} - ${this.analysis.intent.value}`);
   }
 
   async step2_processConclusion(userInput) {
     const input = userInput.toLowerCase().trim();
     let processFound = false;
 
+    console.log(`\n[STEP2] Process Detection Start`);
+
     for (const [process, patterns] of Object.entries(PROCESS_DICTIONARY)) {
       for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
         if (input === keyword.toLowerCase() || input.includes(keyword.toLowerCase())) {
+          console.log(`[STEP2] Primary dictionary match: "${keyword}"`);
           this.analysis.process = { status: 'Clear', value: process, reply: `Detected process: ${process}` };
           this.analysis.step2_reply = `Detected process: ${process}`;
           processFound = true;
@@ -497,9 +531,11 @@ class ConversationAnalyzer {
     }
 
     if (!processFound) {
+      console.log(`[STEP2] Checking phrase dictionary...`);
       for (const [process, phrases] of Object.entries(PROCESS_PHRASE_DICTIONARY)) {
         for (const phrase of phrases) {
           if (input.includes(phrase.toLowerCase())) {
+            console.log(`[STEP2] Phrase dictionary match: "${phrase}"`);
             this.analysis.process = { status: 'Adequate Clarity', value: process, reply: `Detected process: ${process}` };
             this.analysis.step2_reply = `Detected process: ${process}`;
             processFound = true;
@@ -511,26 +547,39 @@ class ConversationAnalyzer {
     }
 
     if (!processFound) {
+      console.log(`[STEP2] Attempting Qdrant search...`);
       const searchText = extractProcessText(input);
+      console.log(`[STEP2] Extracted search text: "${searchText}"`);
+      
       if (searchText) {
         const validation_result = await performCircleValidation(searchText, 'process');
+        
         if (validation_result.matched) {
+          console.log(`[STEP2] Qdrant match successful via ${validation_result.validation_path}: "${validation_result.gold_standard}"`);
           this.analysis.process = { status: validation_result.clarity, value: validation_result.gold_standard, reply: `Detected process: ${validation_result.gold_standard}` };
           this.analysis.step2_reply = `Detected process: ${validation_result.gold_standard}`;
           processFound = true;
           if (validation_result.variables) {
             this.analysis.validation_logs.push({ component_type: 'process', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'ACCEPTED' });
           }
-        } else if (validation_result.variables) {
-          this.analysis.validation_logs.push({ component_type: 'process', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'REJECTED' });
+        } else {
+          console.log(`[STEP2] Qdrant validation failed`);
+          if (validation_result.variables) {
+            this.analysis.validation_logs.push({ component_type: 'process', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'REJECTED' });
+          }
         }
+      } else {
+        console.log(`[STEP2] No process text extracted`);
       }
     }
 
     if (!processFound) {
+      console.log(`[STEP2] No process detected`);
       this.analysis.process = { status: 'Not Found', value: '', reply: 'No process detected.' };
       this.analysis.step2_reply = 'No process detected.';
     }
+    
+    console.log(`[STEP2] Result: ${this.analysis.process.status} - ${this.analysis.process.value}`);
   }
 
   checkHelpRedirect() {
@@ -544,6 +593,7 @@ class ConversationAnalyzer {
         (processStatus === 'Clear' || processStatus === 'Adequate Clarity')) {
       const redirect_url = PROCESS_REFERENCE_MAPPING[processValue];
       if (redirect_url) {
+        console.log(`[HELP_REDIRECT] Redirecting to: ${redirect_url}`);
         this.analysis.finalAnalysis = `Redirecting to help for ${processValue}.`;
         this.analysis.proceed_button = false;
         this.analysis.redirect_flag = true;
@@ -558,9 +608,12 @@ class ConversationAnalyzer {
     const input = userInput.toLowerCase().trim();
     let actionFound = false;
 
+    console.log(`\n[STEP3] Action Detection Start`);
+
     for (const [action, patterns] of Object.entries(ACTION_DICTIONARY)) {
       for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
         if (input.includes(keyword.toLowerCase())) {
+          console.log(`[STEP3] Primary dictionary match: "${keyword}"`);
           this.analysis.action = { status: 'Clear', value: action, reply: `Detected action: ${action}` };
           this.analysis.step3_reply = `Detected action: ${action}`;
           actionFound = true;
@@ -571,9 +624,11 @@ class ConversationAnalyzer {
     }
 
     if (!actionFound) {
+      console.log(`[STEP3] Checking phrase dictionary...`);
       for (const [action, phrases] of Object.entries(ACTION_PHRASE_DICTIONARY)) {
         for (const phrase of phrases) {
           if (input.includes(phrase.toLowerCase())) {
+            console.log(`[STEP3] Phrase dictionary match: "${phrase}"`);
             this.analysis.action = { status: 'Adequate Clarity', value: action, reply: `Detected action: ${action}` };
             this.analysis.step3_reply = `Detected action: ${action}`;
             actionFound = true;
@@ -585,26 +640,37 @@ class ConversationAnalyzer {
     }
 
     if (!actionFound) {
+      console.log(`[STEP3] Attempting Qdrant search...`);
       const searchText = extractActionText(input);
+      console.log(`[STEP3] Extracted action: "${searchText}"`);
+      
       if (searchText) {
         const validation_result = await performCircleValidation(searchText, 'action');
+        
         if (validation_result.matched) {
+          console.log(`[STEP3] Qdrant match successful via ${validation_result.validation_path}: "${validation_result.gold_standard}"`);
           this.analysis.action = { status: validation_result.clarity, value: validation_result.gold_standard, reply: `Detected action: ${validation_result.gold_standard}` };
           this.analysis.step3_reply = `Detected action: ${validation_result.gold_standard}`;
           actionFound = true;
           if (validation_result.variables) {
             this.analysis.validation_logs.push({ component_type: 'action', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'ACCEPTED' });
           }
-        } else if (validation_result.variables) {
-          this.analysis.validation_logs.push({ component_type: 'action', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'REJECTED' });
+        } else {
+          console.log(`[STEP3] Qdrant validation failed`);
+          if (validation_result.variables) {
+            this.analysis.validation_logs.push({ component_type: 'action', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'REJECTED' });
+          }
         }
       }
     }
 
     if (!actionFound) {
+      console.log(`[STEP3] No action detected`);
       this.analysis.action = { status: 'Not Found', value: '', reply: 'No action detected.' };
       this.analysis.step3_reply = 'No action detected.';
     }
+    
+    console.log(`[STEP3] Result: ${this.analysis.action.status} - ${this.analysis.action.value}`);
   }
 
   async step4_filterAnalysis(userInput) {
@@ -612,7 +678,10 @@ class ConversationAnalyzer {
     const intentCategory = this.analysis.intent.value;
     const actionValue = this.analysis.action.value;
 
+    console.log(`\n[STEP4] Filter Analysis Start`);
+
     if (intentCategory !== 'menu' || (actionValue !== 'modify' && actionValue !== 'search')) {
+      console.log(`[STEP4] Filters not applicable (intent: ${intentCategory}, action: ${actionValue})`);
       this.analysis.filters = { status: 'Not Applicable', value: [], reply: 'Filters not applicable.' };
       this.analysis.step4_reply = 'Filters not applicable.';
       return;
@@ -627,6 +696,7 @@ class ConversationAnalyzer {
         const value = match[3] || match[6];
         
         if (filterName && value) {
+          console.log(`[STEP4] Regex match: ${filterName} ${operator} ${value}`);
           detectedFilters.push({
             name: filterName.toLowerCase(),
             operator: operator.toLowerCase(),
@@ -640,10 +710,13 @@ class ConversationAnalyzer {
     }
 
     if (detectedFilters.length === 0) {
+      console.log(`[STEP4] No filters detected`);
       this.analysis.filters = { status: 'Not Found', value: [], reply: 'No filters detected.' };
       this.analysis.step4_reply = 'No filters detected.';
       return;
     }
+
+    console.log(`[STEP4] Found ${detectedFilters.length} potential filters`);
 
     for (let i = 0; i < detectedFilters.length; i++) {
       const filter = detectedFilters[i];
@@ -665,14 +738,17 @@ class ConversationAnalyzer {
     );
 
     if (allClear) {
+      console.log(`[STEP4] All filters clear`);
       this.analysis.filters.status = 'Clear';
       this.analysis.filters.reply = 'Filters are clear.';
       this.analysis.step4_reply = 'Filters are clear.';
     } else if (someValid) {
+      console.log(`[STEP4] Some filters have adequate clarity`);
       this.analysis.filters.status = 'Adequate Clarity';
       this.analysis.filters.reply = 'Filters have adequate clarity.';
       this.analysis.step4_reply = 'Filters have adequate clarity.';
     } else {
+      console.log(`[STEP4] Filters not clear`);
       this.analysis.filters.status = 'Not Clear';
       this.analysis.filters.reply = 'Filters are not clear.';
       this.analysis.step4_reply = 'Filters are not clear.';
@@ -684,9 +760,12 @@ class ConversationAnalyzer {
     const statusKey = `${componentKey}_status`;
     let found = false;
 
+    console.log(`[FILTER_COMPONENT] Analyzing ${category}: "${componentValue}"`);
+
     for (const [standardValue, patterns] of Object.entries(dictionary)) {
       for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
         if (componentValue === keyword.toLowerCase() || componentValue.includes(keyword.toLowerCase())) {
+          console.log(`[FILTER_COMPONENT] Primary match: "${keyword}" -> "${standardValue}"`);
           filter[statusKey] = 'Clear';
           filter[componentKey] = standardValue;
           found = true;
@@ -697,9 +776,11 @@ class ConversationAnalyzer {
     }
 
     if (!found && phraseDictionary) {
+      console.log(`[FILTER_COMPONENT] Checking phrase dictionary...`);
       for (const [standardValue, phrases] of Object.entries(phraseDictionary)) {
         for (const phrase of phrases) {
           if (componentValue.includes(phrase.toLowerCase())) {
+            console.log(`[FILTER_COMPONENT] Phrase match: "${phrase}" -> "${standardValue}"`);
             filter[statusKey] = 'Adequate Clarity';
             filter[componentKey] = standardValue;
             found = true;
@@ -711,9 +792,11 @@ class ConversationAnalyzer {
     }
 
     if (!found) {
+      console.log(`[FILTER_COMPONENT] Attempting Qdrant search...`);
       const validation_result = await performCircleValidation(componentValue, category);
 
       if (validation_result.matched) {
+        console.log(`[FILTER_COMPONENT] Qdrant match via ${validation_result.validation_path}: "${validation_result.gold_standard}"`);
         filter[statusKey] = validation_result.clarity;
         filter[componentKey] = validation_result.gold_standard;
         found = true;
@@ -723,20 +806,26 @@ class ConversationAnalyzer {
             validation_path: validation_result.validation_path, acceptance_status: 'ACCEPTED'
           });
         }
-      } else if (validation_result.variables) {
-        this.analysis.validation_logs.push({
-          component_type: category, ...validation_result.variables,
-          validation_path: validation_result.validation_path, acceptance_status: 'REJECTED'
-        });
+      } else {
+        console.log(`[FILTER_COMPONENT] Qdrant validation failed`);
+        if (validation_result.variables) {
+          this.analysis.validation_logs.push({
+            component_type: category, ...validation_result.variables,
+            validation_path: validation_result.validation_path, acceptance_status: 'REJECTED'
+          });
+        }
       }
     }
 
     if (!found) {
+      console.log(`[FILTER_COMPONENT] No match found, status: Not Clear`);
       filter[statusKey] = 'Not Clear';
     }
   }
 
   step5_finalAnalysis() {
+    console.log(`\n[STEP5] Final Analysis Start`);
+    
     const intentStatus = this.analysis.intent.status;
     const processStatus = this.analysis.process.status;
     const actionStatus = this.analysis.action.status;
@@ -746,6 +835,11 @@ class ConversationAnalyzer {
     const processValue = this.analysis.process.value;
     const actionValue = this.analysis.action.value;
 
+    console.log(`[STEP5] Intent: ${intentStatus} (${intentValue})`);
+    console.log(`[STEP5] Process: ${processStatus} (${processValue})`);
+    console.log(`[STEP5] Action: ${actionStatus} (${actionValue})`);
+    console.log(`[STEP5] Filters: ${filterStatus}`);
+
     const allValid = 
       (intentStatus === 'Clear' || intentStatus === 'Adequate Clarity') &&
       (processStatus === 'Clear' || processStatus === 'Adequate Clarity') &&
@@ -753,6 +847,7 @@ class ConversationAnalyzer {
       (filterStatus === 'Clear' || filterStatus === 'Adequate Clarity' || filterStatus === 'Not Applicable' || filterStatus === 'Not Found');
 
     if (allValid) {
+      console.log(`[STEP5] All validations passed`);
       let filterText = '';
       if (filterStatus === 'Clear' || filterStatus === 'Adequate Clarity') {
         const filterDescriptions = this.analysis.filters.value.map(f => 
@@ -764,11 +859,14 @@ class ConversationAnalyzer {
       this.analysis.finalAnalysis = `Your intent is clear to ${actionValue} on ${processValue}${filterText}.`;
       this.analysis.proceed_button = true;
     } else {
+      console.log(`[STEP5] Validation failed`);
       let failures = [];
       if (intentStatus !== 'Clear' && intentStatus !== 'Adequate Clarity') failures.push('intent');
       if (processStatus !== 'Clear' && processStatus !== 'Adequate Clarity') failures.push('process');
       if (actionStatus !== 'Clear' && actionStatus !== 'Adequate Clarity') failures.push('action');
       if (filterStatus === 'Not Clear') failures.push('filters');
+
+      console.log(`[STEP5] Failures: ${failures.join(', ')}`);
 
       this.analysis.finalAnalysis = `Unable to determine: ${failures.join(', ')}.`;
       this.analysis.proceed_button = false;
@@ -784,9 +882,16 @@ class ConversationAnalyzer {
         this.analysis.example_query = 'Example: "I want to create an objective"';
       }
     }
+    
+    console.log(`[STEP5] Final Analysis: ${this.analysis.finalAnalysis}`);
   }
 
   async analyze(userInput) {
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`NEW ANALYSIS REQUEST`);
+    console.log(`Input: "${userInput}"`);
+    console.log(`${'='.repeat(80)}`);
+    
     this.reset();
     this.analysis.userInput = userInput;
 
@@ -794,12 +899,17 @@ class ConversationAnalyzer {
     await this.step2_processConclusion(userInput);
 
     if (this.checkHelpRedirect()) {
+      console.log(`[ANALYSIS] Redirecting to help`);
       return this.analysis;
     }
 
     await this.step3_actionConclusion(userInput);
     await this.step4_filterAnalysis(userInput);
     this.step5_finalAnalysis();
+
+    console.log(`${'='.repeat(80)}`);
+    console.log(`ANALYSIS COMPLETE`);
+    console.log(`${'='.repeat(80)}\n`);
 
     return this.analysis;
   }
@@ -855,7 +965,7 @@ app.get('/qdrant-status', async (req, res) => {
 
 // ========== API ENDPOINTS ==========
 app.post('/analyze', async (req, res) => {
-  console.log('📥 /analyze endpoint called (backward compatibility)');
+  console.log('📥 /analyze endpoint called');
   try {
     const { sentence } = req.body;
 
