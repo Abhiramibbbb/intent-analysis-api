@@ -211,6 +211,27 @@ function extractActionText(userInput) {
   return '';
 }
 
+// ========== CATEGORY TO GOLD STANDARD PHRASE MAPPING ==========
+const CATEGORY_TO_GOLD_PHRASE = {
+  'intent': {
+    'menu': 'i want to',
+    'help': 'how do i'
+  },
+  'process': {
+    'objective': 'objective',
+    'key result': 'key result',
+    'initiative': 'initiative',
+    'review meeting': 'review meeting',
+    'key result checkin': 'key result checkin'
+  },
+  'action': {
+    'create': 'create',
+    'modify': 'modify',
+    'search': 'search',
+    'delete': 'delete'
+  }
+};
+
 // ========== SEQUENTIAL CIRCLE VALIDATION FUNCTION ==========
 async function performCircleValidation(searchText, category) {
   const categoryMap = {
@@ -236,8 +257,20 @@ async function performCircleValidation(searchText, category) {
       return { matched: false, gold_standard: null, clarity: null, variables: null, validation_path: 'NONE' };
     }
 
-    const gold_standard = results.match;
+    let categoryResult = results.match;
     const new_to_gold_score = results.score;
+
+    console.log(`[Qdrant] Qdrant returned category: "${categoryResult}"`);
+
+    // STEP 1: Map category name to gold standard phrase if needed
+    let gold_standard = categoryResult;
+    if (CATEGORY_TO_GOLD_PHRASE[qdrantCategory]?.[categoryResult]) {
+      gold_standard = CATEGORY_TO_GOLD_PHRASE[qdrantCategory][categoryResult];
+      console.log(`[Qdrant] Mapped category "${categoryResult}" to gold phrase "${gold_standard}"`);
+    } else {
+      gold_standard = categoryResult;
+      console.log(`[Qdrant] No mapping needed, using result as-is: "${gold_standard}"`);
+    }
     
     console.log(`\n[Qdrant] Best Match Found:`);
     console.log(`   Gold Standard: "${gold_standard}"`);
