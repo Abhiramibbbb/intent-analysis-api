@@ -1,3 +1,32 @@
+New chat
+What can I help you with today?
+
+
+Session limit reached ∙ resets 7:00 AM
+Upgrade
+
+
+
+
+
+
+server.js
+1,099 lines
+
+js
+
+
+
+// Inside your Process Qdrant validation: console.log(`\n${'='.repeat(60)}`); console.log(`[PROCESS] CIRCLE VALIDATION START`); console.log(`${'='.repeat(60)}`); console.log(`[PROCESS] Search Text: "${processText}"`); console.log(`[PROCESS] Calling Qdrant with category: "process"`); cons
+
+pasted
+
+
+
+server.js
+45.13 KB •1,099 lines
+•
+Formatting may be inconsistent from source
 require('dotenv').config();
 
 const express = require('express');

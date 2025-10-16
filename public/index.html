@@ -4,184 +4,278 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Conversational UI Intent Analysis</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
+            padding: 20px;
         }
+
         .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            text-align: center;
+            color: #5a67d8;
+            font-size: 2.5rem;
+            margin-bottom: 40px;
+            font-weight: 700;
+        }
+
+        .query-section {
             background: white;
             padding: 30px;
             border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-        h1 {
-            color: #667eea;
-            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
             margin-bottom: 30px;
         }
-        .input-section {
+
+        .section-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #2d3748;
             margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
+
         textarea {
             width: 100%;
+            min-height: 120px;
             padding: 15px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: inherit;
             resize: vertical;
-            min-height: 100px;
+            transition: border-color 0.3s;
         }
-        .button-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
         }
-        button {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .analyze-btn {
-            background: #667eea;
-            color: white;
-            flex: 1;
-        }
-        .analyze-btn:hover {
-            background: #5568d3;
-            transform: translateY(-2px);
-        }
-        .proceed-btn {
-            background: #48bb78;
-            color: white;
-            flex: 1;
-        }
-        .proceed-btn:hover {
-            background: #38a169;
-        }
-        .clear-btn {
-            background: #718096;
-            color: white;
-            flex: 1;
-        }
-        .clear-btn:hover {
-            background: #4a5568;
-        }
-        .result-section {
-            margin-top: 30px;
-            padding: 20px;
-            background: #f7fafc;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-        }
-        .analysis-result {
-            margin-bottom: 20px;
-            padding: 15px;
-            background: #e6fffa;
-            border-radius: 8px;
-        }
-        .detailed-analysis {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-top: 20px;
-        }
-        .analysis-item {
-            padding: 15px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .analysis-item strong {
-            color: #667eea;
-            display: block;
-            margin-bottom: 5px;
-        }
-        .history-section {
-            margin-top: 40px;
-        }
-        .history-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        .refresh-btn {
-            background: #4299e1;
-            color: white;
-            padding: 8px 16px;
-        }
-        .refresh-btn:hover {
-            background: #3182ce;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        th {
-            background: #667eea;
-            color: white;
-            font-weight: 600;
-        }
-        tr:hover {
-            background: #f7fafc;
-        }
+
         .char-count {
             text-align: right;
             color: #718096;
             font-size: 14px;
-            margin-top: 5px;
+            margin-top: 8px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .analyze-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .analyze-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .clear-btn {
+            background: #718096;
+            color: white;
+        }
+
+        .clear-btn:hover {
+            background: #4a5568;
+            transform: translateY(-2px);
+        }
+
+        .proceed-btn {
+            background: #48bb78;
+            color: white;
+        }
+
+        .proceed-btn:hover {
+            background: #38a169;
+            transform: translateY(-2px);
+        }
+
+        .result-section {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+            margin-bottom: 30px;
+        }
+
+        .analysis-result {
+            padding: 20px;
+            background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);
+            border-left: 4px solid #667eea;
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }
+
+        .detailed-analysis {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .analysis-item {
+            padding: 20px;
+            background: #f7fafc;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .analysis-item strong {
+            display: block;
+            color: #667eea;
+            font-size: 14px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .history-section {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .refresh-btn {
+            background: #4299e1;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .refresh-btn:hover {
+            background: #3182ce;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 14px;
+        }
+
+        tbody tr:hover {
+            background: #f7fafc;
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🎯 Conversational UI Intent Analysis</h1>
-        
-        <div class="input-section">
-            <h3>📝 Enter Your Query</h3>
-            <textarea id="userInput" placeholder="Type your sentence here... (e.g., 'I want to create an objective')"></textarea>
-            <div class="char-count" id="charCount">Character count: 0/500</div>
-            
+
+        <div class="query-section">
+            <div class="section-title">📝 Enter Your Query</div>
+            <label for="userInput" style="display: block; margin-bottom: 10px; font-size: 14px; color: #4a5568;">
+                Input Sentence
+            </label>
+            <textarea 
+                id="userInput" 
+                placeholder="Type your sentence here... (e.g., 'I want to create an objective')"
+            ></textarea>
+            <div class="char-count">Character count: <span id="charCount">0</span>/500</div>
+
             <div class="button-group">
-                <button class="analyze-btn" onclick="analyzeIntent()">🔍 Analyze Intent</button>
-                <button class="proceed-btn" id="proceedBtn" style="display:none;">➡️ Proceed</button>
-                <button class="clear-btn" onclick="clearForm()">🗑️ Clear</button>
+                <button class="analyze-btn" onclick="analyzeIntent()">
+                    🔍 Analyze Intent
+                </button>
+                <button class="proceed-btn" id="proceedBtn" style="display:none;">
+                    ➡️ Proceed
+                </button>
+                <button class="clear-btn" onclick="clearInput()">
+                    🗑️ Clear
+                </button>
             </div>
         </div>
 
         <div id="resultSection" class="result-section" style="display:none;">
+            <div class="section-title">📊 Analysis Result</div>
             <div class="analysis-result" id="analysisResult"></div>
-            
-            <h3>📊 Detailed Analysis</h3>
+
+            <div class="section-title" style="margin-top: 25px;">📋 Detailed Analysis</div>
             <div class="detailed-analysis">
                 <div class="analysis-item">
-                    <strong>Intent:</strong>
+                    <strong>Intent</strong>
                     <span id="intentDetail">-</span>
                 </div>
                 <div class="analysis-item">
-                    <strong>Process:</strong>
+                    <strong>Process</strong>
                     <span id="processDetail">-</span>
                 </div>
                 <div class="analysis-item">
-                    <strong>Action:</strong>
+                    <strong>Action</strong>
                     <span id="actionDetail">-</span>
                 </div>
                 <div class="analysis-item">
-                    <strong>Filters:</strong>
+                    <strong>Filters</strong>
                     <span id="filtersDetail">-</span>
                 </div>
             </div>
@@ -189,79 +283,90 @@
 
         <div class="history-section">
             <div class="history-header">
-                <h3>📜 Analysis History</h3>
-                <button class="refresh-btn" onclick="loadAnalysisHistory()">🔄 Refresh</button>
+                <div class="section-title">📜 Analysis History</div>
+                <button class="refresh-btn" onclick="loadAnalysisHistory()">
+                    🔄 Refresh
+                </button>
             </div>
-            <table id="historyTable">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>INTENT</th>
-                        <th>PROCESS</th>
-                        <th>ACTION</th>
-                        <th>FILTERS</th>
-                        <th>FINAL ANALYSIS</th>
-                        <th>SUGGESTED ACTION</th>
-                        <th>EXAMPLE QUERY</th>
-                        <th>PROCEED</th>
-                        <th>TIMESTAMP</th>
-                    </tr>
-                </thead>
-                <tbody id="historyBody">
-                    <!-- History entries will be populated here -->
-                </tbody>
-            </table>
+            
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>INTENT</th>
+                            <th>PROCESS</th>
+                            <th>ACTION</th>
+                            <th>FILTERS</th>
+                            <th>FINAL ANALYSIS</th>
+                            <th>SUGGESTED ACTION</th>
+                            <th>EXAMPLE QUERY</th>
+                            <th>PROCEED</th>
+                            <th>TIMESTAMP</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyBody">
+                        <tr>
+                            <td colspan="10" style="text-align: center; padding: 40px; color: #a0aec0;">
+                                No analysis history yet. Analyze a sentence to see results here.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
     <script>
         // Character counter
-        document.getElementById('userInput').addEventListener('input', function() {
+        const userInput = document.getElementById('userInput');
+        const charCount = document.getElementById('charCount');
+        
+        userInput.addEventListener('input', function() {
             const count = this.value.length;
-            document.getElementById('charCount').textContent = `Character count: ${count}/500`;
+            charCount.textContent = count;
+            if (count > 500) {
+                this.value = this.value.substring(0, 500);
+                charCount.textContent = '500';
+            }
         });
 
-        // Analyze Intent Function
+        // Analyze Intent
         async function analyzeIntent() {
-            const sentence = document.getElementById('userInput').value.trim();
+            const sentence = userInput.value.trim();
             
             if (!sentence) {
-                alert('Please enter a sentence to analyze.');
+                alert('⚠️ Please enter a sentence to analyze.');
                 return;
             }
 
             try {
-                // Show loading state
                 const resultSection = document.getElementById('resultSection');
                 const analysisResult = document.getElementById('analysisResult');
+                
                 resultSection.style.display = 'block';
-                analysisResult.innerHTML = '⏳ Analyzing...';
+                analysisResult.innerHTML = '<p style="text-align: center; color: #667eea;">⏳ Analyzing your input...</p>';
 
-                // Call API
                 const response = await fetch('/analyze', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ sentence: sentence })
                 });
 
                 const data = await response.json();
-
-                // Display results
                 displayResults(data);
 
-                // ✅ AUTO-REFRESH HISTORY AFTER ANALYSIS
+                // ✅ ADDED: Auto-refresh history after analysis
                 await loadAnalysisHistory();
 
             } catch (error) {
                 console.error('Error:', error);
                 document.getElementById('analysisResult').innerHTML = 
-                    `❌ Error: ${error.message}`;
+                    `<p style="color: #e53e3e;">❌ Error: ${error.message}</p>`;
             }
         }
 
-        // Display Results Function
+        // Display Results
         function displayResults(data) {
             const analysisResult = document.getElementById('analysisResult');
             const intentDetail = document.getElementById('intentDetail');
@@ -270,52 +375,56 @@
             const filtersDetail = document.getElementById('filtersDetail');
             const proceedBtn = document.getElementById('proceedBtn');
 
-            // Main analysis result
             analysisResult.innerHTML = `
-                <h4>Analysis Result:</h4>
-                <p>${data.analysis || data.message || 'Analysis completed'}</p>
-                ${data.suggestion ? `<p>💡 <strong>Suggestion:</strong> ${data.suggestion}</p>` : ''}
-                ${data.example ? `<p>📝 <strong>Example:</strong> ${data.example}</p>` : ''}
+                <div style="margin-bottom: 15px;">
+                    <strong style="color: #2d3748; font-size: 16px;">Analysis Result:</strong>
+                    <p style="margin-top: 10px; line-height: 1.6;">${data.analysis || data.message || 'Analysis completed'}</p>
+                </div>
+                ${data.suggestion ? `
+                    <div style="margin-top: 15px; padding: 12px; background: #fef5e7; border-left: 3px solid #f39c12; border-radius: 5px;">
+                        <strong>💡 Suggestion:</strong> ${data.suggestion}
+                    </div>
+                ` : ''}
+                ${data.example ? `
+                    <div style="margin-top: 15px; padding: 12px; background: #e8f5e9; border-left: 3px solid #4caf50; border-radius: 5px;">
+                        <strong>📝 Example:</strong> ${data.example}
+                    </div>
+                ` : ''}
             `;
 
-            // Detailed analysis
             intentDetail.textContent = `${data.intent?.status || 'Unknown'} (${data.intent?.category || 'N/A'})`;
             processDetail.textContent = `${data.process?.status || 'Unknown'} (${data.process?.detected || 'N/A'})`;
             actionDetail.textContent = `${data.action?.status || 'Unknown'} (${data.action?.detected || 'N/A'})`;
             filtersDetail.textContent = data.filters?.status || 'Not Applicable';
 
-            // Show/hide proceed button
-            if (data.proceedButton === true) {
-                proceedBtn.style.display = 'inline-block';
-            } else {
-                proceedBtn.style.display = 'none';
-            }
+            proceedBtn.style.display = data.proceedButton ? 'flex' : 'none';
 
-            // Handle redirect
             if (data.redirectFlag && data.redirectURL) {
                 setTimeout(() => {
-                    if (confirm(`Redirecting to help documentation. Continue?`)) {
+                    if (confirm('Redirecting to help documentation. Continue?')) {
                         window.location.href = data.redirectURL;
                     }
                 }, 1000);
             }
         }
 
-        // Load Analysis History Function
+        // Load Analysis History
         async function loadAnalysisHistory() {
             try {
-                console.log('Loading analysis history...');
-                
                 const response = await fetch('/api/history');
                 const history = await response.json();
                 
-                console.log('History loaded:', history.length, 'entries');
-                
-                const historyBody = document.getElementById('historyBody');
-                historyBody.innerHTML = '';
+                const tbody = document.getElementById('historyBody');
+                tbody.innerHTML = '';
 
-                if (history.length === 0) {
-                    historyBody.innerHTML = '<tr><td colspan="10" style="text-align:center;">No analysis history yet</td></tr>';
+                if (!history || history.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="10" style="text-align: center; padding: 40px; color: #a0aec0;">
+                                No analysis history yet. Analyze a sentence to see results here.
+                            </td>
+                        </tr>
+                    `;
                     return;
                 }
 
@@ -333,30 +442,23 @@
                         <td>${entry.proceedButton ? 'Yes' : 'No'}</td>
                         <td>${new Date(entry.timestamp).toLocaleString()}</td>
                     `;
-                    historyBody.appendChild(row);
+                    tbody.appendChild(row);
                 });
-
-                console.log('History table updated successfully');
             } catch (error) {
                 console.error('Error loading history:', error);
-                document.getElementById('historyBody').innerHTML = 
-                    '<tr><td colspan="10" style="text-align:center; color:red;">Error loading history</td></tr>';
             }
         }
 
-        // Clear Form Function
-        function clearForm() {
-            document.getElementById('userInput').value = '';
-            document.getElementById('charCount').textContent = 'Character count: 0/500';
+        // Clear Input
+        function clearInput() {
+            userInput.value = '';
+            charCount.textContent = '0';
             document.getElementById('resultSection').style.display = 'none';
             document.getElementById('proceedBtn').style.display = 'none';
         }
 
-        // Load history on page load
-        window.addEventListener('load', () => {
-            console.log('Page loaded, loading initial history...');
-            loadAnalysisHistory();
-        });
+        // ✅ ADDED: Load history on page load
+        window.addEventListener('load', loadAnalysisHistory);
     </script>
 </body>
 </html>
