@@ -24,7 +24,8 @@ class QdrantService {
             this.initialized = true;
             console.log('Qdrant service initialized successfully');
         } catch (error) {
-            console.error('Failed to initialize Qdrant service:', error);
+            console.error('Failed to initialize Qdrant service:', error.message);
+            this.initialized = false;
             throw error;
         }
     }
@@ -35,24 +36,31 @@ class QdrantService {
             const exists = collections.collections.some(c => c.name === this.collectionName);
 
             if (!exists) {
+                console.log(`Creating collection: ${this.collectionName}`);
                 await this.client.createCollection(this.collectionName, {
                     vectors: { size: 384, distance: 'Cosine' },
                     optimizers_config: { indexing_threshold: 0 }
                 });
-                console.log(`Created collection: ${this.collectionName}`);
+            } else {
+                console.log(`Collection exists: ${this.collectionName}`);
             }
         } catch (error) {
-            console.error('Error ensuring collection exists:', error);
+            console.error('Error ensuring collection:', error.message);
             throw error;
         }
     }
 
     async getEmbedding(text) {
         if (!this.embedder) {
-            throw new Error('Embedder not initialized. Call initialize() first.');
+            throw new Error('Embedder not initialized');
         }
-        const output = await this.embedder(text, { pooling: 'mean', normalize: true });
-        return Array.from(output.data);
+        try {
+            const output = await this.embedder(text, { pooling: 'mean', normalize: true });
+            return Array.from(output.data);
+        } catch (error) {
+            console.error('Error generating embedding:', error.message);
+            throw error;
+        }
     }
 
     async indexDictionaries(dictionaries) {
@@ -97,7 +105,10 @@ class QdrantService {
                 points.push({
                     id: id++,
                     vector: embedding,
-                    payload: { category: 'filter_value', value: pattern, text: pattern, filterCategory: category, isPrimary: patterns.primary.includes(pattern) }
+                    payload: { 
+                        category: 'filter_value', value: pattern, text: pattern, 
+                        filterCategory: category, isPrimary: patterns.primary.includes(pattern) 
+                    }
                 });
             }
         }
@@ -120,11 +131,13 @@ class QdrantService {
             console.log(`Indexed batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(points.length / batchSize)}`);
         }
 
-        console.log(`Successfully indexed ${points.length} entries in Qdrant`);
+        console.log(`Successfully indexed ${points.length} entries`);
     }
 
-    async searchSimilar(text, category, limit = 10, scoreThreshold = 0.7) {
-        if (!this.initialized) await this.initialize();
+    async searchSimilar(text, category, limit = 10, scoreThreshold = 0.0) {
+        if (!this.initialized) {
+            throw new Error('Service not initialized');
+        }
 
         try {
             const embedding = await this.getEmbedding(text);
@@ -135,24 +148,24 @@ class QdrantService {
                 with_payload: true
             });
 
-            console.log(`🔍 Qdrant search for "${text}" in "${category}" - found ${searchResult.length} results`);
-            if (searchResult.length > 0) {
-                console.log(`   Top result: ${searchResult[0].payload.value} (score: ${searchResult[0].score.toFixed(3)})`);
+            if (searchResult.length === 0) {
+                return { match: null, score: 0, matches: [] };
             }
 
-            const filteredResults = searchResult.filter(r => r.score >= scoreThreshold);
-            if (filteredResults.length === 0) return { match: null, score: 0, matches: [] };
-
-            const bestMatch = filteredResults[0];
+            const bestMatch = searchResult[0];
             return {
                 match: bestMatch.payload.value,
                 score: bestMatch.score,
                 text: bestMatch.payload.text,
                 isPrimary: bestMatch.payload.isPrimary,
-                matches: filteredResults.map(r => ({ value: r.payload.value, score: r.score, text: r.payload.text }))
+                matches: searchResult.map(r => ({ 
+                    value: r.payload.value, 
+                    score: r.score, 
+                    text: r.payload.text 
+                }))
             };
         } catch (error) {
-            console.error(`Error searching for ${category}:`, error);
+            console.error(`Error searching: ${error.message}`);
             return { match: null, score: 0, matches: [] };
         }
     }
@@ -164,7 +177,7 @@ class QdrantService {
             await this.ensureCollection();
             console.log('Collection cleared and recreated');
         } catch (error) {
-            console.error('Error clearing collection:', error);
+            console.error('Error clearing collection:', error.message);
         }
     }
 
@@ -173,7 +186,7 @@ class QdrantService {
             const info = await this.client.getCollection(this.collectionName);
             return info;
         } catch (error) {
-            console.error('Error getting collection info:', error);
+            console.error('Error getting collection info:', error.message);
             return null;
         }
     }
