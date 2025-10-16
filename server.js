@@ -964,136 +964,122 @@ app.get('/qdrant-status', async (req, res) => {
 });
 
 // ========== API ENDPOINTS ==========
+// ========== API ENDPOINTS ==========
+
 app.post('/analyze', async (req, res) => {
-  console.log('📥 /analyze endpoint called');
-  try {
-    const { sentence } = req.body;
+    console.log('📥 /analyze endpoint called');
+    try {
+        const { sentence } = req.body;
+        
+        if (!sentence || sentence.trim() === '') {
+            console.log('⚠️ Empty sentence provided');
+            return res.status(400).json({ success: false, error: 'Sentence is required' });
+        }
 
-    if (!sentence || sentence.trim() === '') {
-      console.log('⚠️ Empty sentence provided');
-      return res.status(400).json({ success: false, error: 'Sentence is required' });
+        if (!qdrantService.initialized) {
+            console.log('⚠️ Qdrant service not initialized');
+            return res.status(503).json({ success: false, error: 'Service initializing. Please try again.' });
+        }
+
+        console.log(`🔍 Analyzing: "${sentence}"`);
+        const analyzer = new ConversationAnalyzer();
+        const analysis = await analyzer.analyze(sentence);
+
+        const logEntry = {
+            timestamp: new Date().toISOString(),
+            sentence: sentence,
+            analysis: analysis,
+            validation_logs: analysis.validation_logs
+        };
+
+        logs.push(logEntry);
+        if (logs.length > 100) logs.shift();
+
+        console.log('✅ Analysis completed successfully');
+        res.json({ success: true, analysis: analysis });
+
+    } catch (error) {
+        console.error('❌ Error in /analyze:', error.message);
+        console.error('Stack trace:', error.stack);
+        res.status(500).json({ success: false, error: 'Analysis failed', message: error.message });
     }
-
-    if (!qdrantService.initialized) {
-      console.log('⚠️ Qdrant service not initialized');
-      return res.status(503).json({ success: false, error: 'Service initializing. Please try again.' });
-    }
-
-    console.log(`🔍 Analyzing: "${sentence}"`);
-    const analyzer = new ConversationAnalyzer();
-    const analysis = await analyzer.analyze(sentence);
-
-    const logEntry = {
-      timestamp: new Date().toISOString(),
-      sentence: sentence,
-      analysis: analysis,
-      validation_logs: analysis.validation_logs
-    };
-    logs.push(logEntry);
-
-    if (logs.length > 100) logs.shift();
-
-    console.log('✅ Analysis completed successfully');
-    res.json({ success: true, analysis: analysis });
-
-  } catch (error) {
-    console.error('❌ Error in /analyze:', error.message);
-    console.error('Stack trace:', error.stack);
-    res.status(500).json({ success: false, error: 'Analysis failed', message: error.message });
-  }
 });
 
 app.post('/api/analyze', async (req, res) => {
-  console.log('📥 /api/analyze endpoint called');
-  try {
-    const { sentence } = req.body;
+    console.log('📥 /api/analyze endpoint called');
+    try {
+        const { sentence } = req.body;
+        
+        if (!sentence || sentence.trim() === '') {
+            console.log('⚠️ Empty sentence provided');
+            return res.status(400).json({ success: false, error: 'Sentence is required' });
+        }
 
-    if (!sentence || sentence.trim() === '') {
-      console.log('⚠️ Empty sentence provided');
-      return res.status(400).json({ success: false, error: 'Sentence is required' });
+        if (!qdrantService.initialized) {
+            console.log('⚠️ Qdrant service not initialized');
+            return res.status(503).json({ success: false, error: 'Service initializing. Please try again.' });
+        }
+
+        console.log(`🔍 Analyzing: "${sentence}"`);
+        const analyzer = new ConversationAnalyzer();
+        const analysis = await analyzer.analyze(sentence);
+
+        const logEntry = {
+            timestamp: new Date().toISOString(),
+            sentence: sentence,
+            analysis: analysis,
+            validation_logs: analysis.validation_logs
+        };
+
+        logs.push(logEntry);
+        if (logs.length > 100) logs.shift();
+
+        console.log('✅ Analysis completed successfully');
+        res.json({ success: true, analysis: analysis });
+
+    } catch (error) {
+        console.error('❌ Error in /api/analyze:', error.message);
+        console.error('Stack trace:', error.stack);
+        res.status(500).json({ success: false, error: 'Analysis failed', message: error.message });
     }
-
-    if (!qdrantService.initialized) {
-      console.log('⚠️ Qdrant service not initialized');
-      return res.status(503).json({ success: false, error: 'Service initializing. Please try again.' });
-    }
-
-    console.log(`🔍 Analyzing: "${sentence}"`);
-    const analyzer = new ConversationAnalyzer();
-    const analysis = await analyzer.analyze(sentence);
-
-    const logEntry = {
-      timestamp: new Date().toISOString(),
-      sentence: sentence,
-      analysis: analysis,
-      validation_logs: analysis.validation_logs
-    };
-    logs.push(logEntry);
-
-    if (logs.length > 100) logs.shift();
-
-    console.log('✅ Analysis completed successfully');
-    res.json({ success: true, analysis: analysis });
-
-  } catch (error) {
-    console.error('❌ Error in /api/analyze:', error.message);
-    console.error('Stack trace:', error.stack);
-    res.status(500).json({ success: false, error: 'Analysis failed', message: error.message });
-  }
 });
 
 app.get('/api/logs', (req, res) => {
-  console.log('📋 Logs requested');
-  res.json({ success: true, logs: logs });
+    console.log('📋 Logs requested');
+    res.json({ success: true, logs: logs });
+});
+
+// ✅ NEW: History endpoint for conversation logs table
+app.get('/api/history', (req, res) => {
+    console.log('📜 History requested');
+    try {
+        const formattedHistory = logs.map((log, index) => ({
+            id: index + 1,
+            intent: log.analysis.intent.value || '-',
+            process: log.analysis.process.value || '-',
+            action: log.analysis.action.value || '-',
+            filters: log.analysis.filters.status || '-',
+            finalAnalysis: log.analysis.finalAnalysis || '-',
+            suggestedAction: log.analysis.suggested_action || '-',
+            exampleQuery: log.analysis.example_query || '-',
+            proceedButton: log.analysis.proceed_button,
+            timestamp: log.timestamp
+        }));
+        
+        res.json(formattedHistory);
+    } catch (error) {
+        console.error('❌ Error in /api/history:', error.message);
+        res.status(500).json([]);
+    }
 });
 
 app.post('/api/logs/clear', (req, res) => {
-  console.log('🗑️ Logs cleared');
-  logs.length = 0;
-  res.json({ success: true, message: 'Logs cleared' });
+    console.log('🗑️ Logs cleared');
+    logs.length = 0;
+    res.json({ success: true, message: 'Logs cleared' });
 });
 
 app.get('/', (req, res) => {
-  console.log('🏠 Root endpoint accessed');
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// ========== ERROR HANDLING ==========
-process.on('uncaughtException', (err) => {
-  console.error('💥 UNCAUGHT EXCEPTION:', err.message);
-  console.error(err.stack);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('💥 UNHANDLED REJECTION at:', promise);
-  console.error('Reason:', reason);
-});
-
-// ========== SERVER STARTUP ==========
-app.listen(PORT, async () => {
-  console.log(`\n${'='.repeat(80)}`);
-  console.log(`SERVER STARTING`);
-  console.log(`Port: ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`Node version: ${process.version}`);
-  console.log(`${'='.repeat(80)}`);
-  
-  try {
-    console.log('Initializing Qdrant service...');
-    await qdrantService.initialize();
-    console.log('✓ Qdrant service initialized successfully');
-    console.log(`Safety Floor: ${SAFETY_FLOOR}`);
-    console.log(`Max Distance to Gold: ${MAX_DISTANCE_TO_GOLD}`);
-    console.log(`Max Distance to Ref1: ${MAX_DISTANCE_TO_REF1}`);
-    console.log(`Max Distance to Ref2: ${MAX_DISTANCE_TO_REF2}`);
-    console.log(`${'='.repeat(80)}\n`);
-    console.log(`🚀 Server is ready and listening on port ${PORT}`);
-    console.log(`📍 Health check: http://localhost:${PORT}/health`);
-    console.log(`📍 Qdrant status: http://localhost:${PORT}/qdrant-status`);
-    console.log(`📍 API endpoint: http://localhost:${PORT}/analyze`);
-    console.log(`${'='.repeat(80)}\n`);
-  } catch (error) {
-    console.error('❌ Failed to initialize Qdrant service:', error.message);
-    console.log('⚠️ Server is running but Qdrant service is not ready');
-  }
+    console.log('🏠 Root endpoint accessed');
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
