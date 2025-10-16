@@ -9,123 +9,153 @@ const logsTableBody = document.getElementById('logsTableBody');
 
 // Character counter
 sentenceInput.addEventListener('input', () => {
-    charCount.textContent = sentenceInput.value.length;
+  charCount.textContent = sentenceInput.value.length;
 });
 
 // Analyze button
 analyzeBtn.addEventListener('click', async () => {
-    const sentence = sentenceInput.value.trim();
-    if (!sentence) {
-        alert('Please enter a sentence to analyze');
-        return;
+  const sentence = sentenceInput.value.trim();
+  
+  if (!sentence) {
+    alert('Please enter a sentence to analyze');
+    return;
+  }
+
+  analyzeBtn.disabled = true;
+  analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+  proceedBtn.disabled = true;
+
+  try {
+    const response = await fetch('/analyze', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ sentence })
+    });
+
+    const data = await response.json();
+    
+    // FIXED: Access data.analysis instead of data directly
+    const analysis = data.success ? data.analysis : null;
+    
+    if (!analysis) {
+      throw new Error(data.error || 'Analysis failed');
     }
 
-    analyzeBtn.disabled = true;
-    analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
-    proceedBtn.disabled = true;
+    // Check for redirect
+    if (analysis.redirect_flag && analysis.redirect_url) {
+      window.location.href = analysis.redirect_url;
+      return;
+    }
 
-    try {
-        const response = await fetch('/analyze', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sentence })
-        });
-
-        const data = await response.json();
-
-        // Check for redirect
-        if (data.redirect_flag && data.redirect_url) {
-            window.location.href = data.redirect_url;
-            return;
-        }
-
-        // Display result
-        analysisResult.style.display = 'block';
-        analysisResult.innerHTML = `
-            <div class="result-box">
-                <h5><i class="fas fa-chart-bar"></i> Analysis Result</h5>
-                <div class="alert ${data.proceed_button ? 'alert-success' : 'alert-warning'}">
-                    ${data.analysis_reply}
-                </div>
-                ${data.suggested_action ? `<p class="mb-2"><strong><i class="fas fa-lightbulb"></i> Suggestion:</strong> ${data.suggested_action}</p>` : ''}
-                ${data.example_query ? `<p class="mb-0"><strong><i class="fas fa-quote-right"></i> Example:</strong> "${data.example_query}"</p>` : ''}
-            </div>
-        `;
-
-        // Enable/disable proceed button
-        proceedBtn.disabled = !data.proceed_button;
+    // Display result
+    analysisResult.style.display = 'block';
+    analysisResult.innerHTML = `
+      <div class="alert ${analysis.proceed_button ? 'alert-success' : 'alert-warning'}">
+        <strong>Analysis Result:</strong>
+        <p>${analysis.finalAnalysis}</p>
         
-        loadLogs();
-    } catch (error) {
-        console.error('Error:', error);
-        analysisResult.style.display = 'block';
-        analysisResult.innerHTML = `
-            <div class="result-box">
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-triangle"></i> Error analyzing sentence. Please try again.
-                </div>
-            </div>
-        `;
-        proceedBtn.disabled = true;
-    } finally {
-        analyzeBtn.disabled = false;
-        analyzeBtn.innerHTML = '<i class="fas fa-search"></i> Analyze Intent';
-    }
-});
+        ${analysis.suggested_action ? `
+          <hr>
+          <p><strong>💡 Suggestion:</strong> ${analysis.suggested_action}</p>
+        ` : ''}
+        
+        ${analysis.example_query ? `
+          <p><strong>📝 Example:</strong> "${analysis.example_query}"</p>
+        ` : ''}
+      </div>
 
-// Clear button
-clearBtn.addEventListener('click', () => {
-    sentenceInput.value = '';
-    charCount.textContent = '0';
-    analysisResult.style.display = 'none';
-    proceedBtn.disabled = true;
+      <div class="details-section">
+        <h5>📊 Detailed Analysis</h5>
+        <div class="row">
+          <div class="col-md-6">
+            <div class="analysis-card">
+              <strong>Intent:</strong> ${analysis.intent.status}
+              ${analysis.intent.value ? ` (${analysis.intent.value})` : ''}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="analysis-card">
+              <strong>Process:</strong> ${analysis.process.status}
+              ${analysis.process.value ? ` (${analysis.process.value})` : ''}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="analysis-card">
+              <strong>Action:</strong> ${analysis.action.status}
+              ${analysis.action.value ? ` (${analysis.action.value})` : ''}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="analysis-card">
+              <strong>Filters:</strong> ${analysis.filters.status}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Enable proceed button if analysis was successful
+    if (analysis.proceed_button) {
+      proceedBtn.disabled = false;
+    }
+
+  } catch (error) {
+    console.error('Error:', error);
+    analysisResult.style.display = 'block';
+    analysisResult.innerHTML = `
+      <div class="alert alert-danger">
+        <strong>Error:</strong> ${error.message}
+        <p>Please try again or check the console for details.</p>
+      </div>
+    `;
+  } finally {
+    analyzeBtn.disabled = false;
+    analyzeBtn.innerHTML = '<i class="fas fa-search"></i> Analyze Intent';
+  }
 });
 
 // Proceed button
 proceedBtn.addEventListener('click', () => {
-    alert('Proceeding with the action...');
-    // Add your proceed logic here
+  alert('Proceeding with the action...');
+  // Add your proceed logic here
+});
+
+// Clear button
+clearBtn.addEventListener('click', () => {
+  sentenceInput.value = '';
+  charCount.textContent = '0';
+  analysisResult.style.display = 'none';
+  proceedBtn.disabled = true;
+  analyzeBtn.disabled = false;
 });
 
 // Refresh logs button
-refreshBtn.addEventListener('click', loadLogs);
-
-// Load logs function
-async function loadLogs() {
-    try {
-        const response = await fetch('/logs');
-        const logs = await response.json();
-
-        if (logs.length === 0) {
-            logsTableBody.innerHTML = '<tr><td colspan="10" class="text-center py-4">No analysis history available</td></tr>';
-            return;
-        }
-
-        logsTableBody.innerHTML = logs.reverse().map(log => `
-            <tr>
-                <td>${log.Sentence_ID}</td>
-                <td class="${getStatusClass(log.Intent)}">${log.Intent}</td>
-                <td class="${getStatusClass(log.Process)}">${log.Process}</td>
-                <td class="${getStatusClass(log.Action)}">${log.Action}</td>
-                <td>${log.Filters}</td>
-                <td>${log.Final_Analysis_Response_Status}</td>
-                <td>${log.Suggested_Action || '-'}</td>
-                <td>${log.Example_Query || '-'}</td>
-                <td><span class="badge ${log.Proceed_Button_Status === 'Yes' ? 'bg-success' : 'bg-secondary'}">${log.Proceed_Button_Status}</span></td>
-                <td>${new Date(log.Timestamp).toLocaleString()}</td>
-            </tr>
-        `).join('');
-    } catch (error) {
-        console.error('Error loading logs:', error);
+refreshBtn.addEventListener('click', async () => {
+  try {
+    const response = await fetch('/api/logs');
+    const data = await response.json();
+    
+    if (data.success && data.logs) {
+      logsTableBody.innerHTML = '';
+      
+      data.logs.forEach(log => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${new Date(log.timestamp).toLocaleString()}</td>
+          <td>${log.sentence}</td>
+          <td>${log.analysis.finalAnalysis}</td>
+        `;
+        logsTableBody.appendChild(row);
+      });
     }
-}
-
-function getStatusClass(status) {
-    if (status === 'Clear') return 'status-clear';
-    if (status === 'Adequate Clarity') return 'status-adequate';
-    if (status === 'Not Clear') return 'status-not-clear';
-    return 'status-not-found';
-}
+  } catch (error) {
+    console.error('Error fetching logs:', error);
+  }
+});
 
 // Load logs on page load
-loadLogs();
+window.addEventListener('DOMContentLoaded', () => {
+  refreshBtn.click();
+});
