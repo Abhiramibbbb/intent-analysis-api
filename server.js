@@ -8,6 +8,7 @@ const qdrantService = require('./qdrant-service');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Constants from Pseudocode
 const SAFETY_FLOOR = 0.30;
 const MAX_DISTANCE_TO_GOLD = 0.3;
 const MAX_DISTANCE_TO_REF1 = 0.2;
@@ -20,6 +21,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.use('/docs', express.static('docs'));
 
+// Reference Mappings
 const REFERENCE_MAPPINGS = {
   intent: {
     ref1: { 'i want to': 'i need to', 'how do i': 'how can i' },
@@ -47,18 +49,30 @@ const REFERENCE_MAPPINGS = {
   }
 };
 
-const GOLD_TO_REF_SCORES = {
-  intent: { ref1: { 'i want to': 0.7774, 'how do i': 0.9350 }, ref2: { 'i want to': 0.7732, 'how do i': 0.5516 } },
-  action: { ref1: { 'create': 0.3091, 'modify': 0.6299, 'search': 0.6734, 'delete': 0.7576 }, ref2: { 'create': 0.7006, 'modify': 0.7718, 'search': 0.6685, 'delete': 0.5458 } },
-  process: { ref1: { 'objective': 0.4860, 'key result': 0.2255, 'initiative': 0.3236, 'review meeting': 0.6623, 'key result checkin': 0.4353 }, ref2: { 'objective': 0.4323, 'key result': 0.2717, 'initiative': 0.4775, 'review meeting': 0.2810, 'key result checkin': 0.1245 } },
-  filter_name: { ref1: { 'due': 0.4843, 'priority': 0.6234, 'status': 0.4275, 'assigned': 0.4233, 'quarter': 0.3942 }, ref2: { 'due': 0.3741, 'priority': 0.4828, 'status': 0.6076, 'assigned': 0.3655, 'quarter': 0.3058 } },
-  filter_operator: { ref1: { 'equal to': 0.4684, 'greater than': 0.4281, 'less than': 0.3261 }, ref2: { 'equal to': 0.4684, 'greater than': 0.4281, 'less than': 0.3261 } },
-  filter_value: { ref1: { 'today': 0.7743, 'high': 0.3951, 'pending': 0.5588, 'q1': 0.3209 }, ref2: { 'today': 0.8571, 'high': 0.7103, 'pending': 0.5231, 'q1': 0.3022 } }
+// Pre-calculated Gold→Ref1 Scores
+const GOLD_TO_REF1_SCORES = {
+  intent: { 'i want to': 0.7774, 'how do i': 0.9350 },
+  action: { 'create': 0.3091, 'modify': 0.6299, 'search': 0.6734, 'delete': 0.7576 },
+  process: { 'objective': 0.4860, 'key result': 0.2255, 'initiative': 0.3236, 'review meeting': 0.6623, 'key result checkin': 0.4353 },
+  filter_name: { 'due': 0.4843, 'priority': 0.6234, 'status': 0.4275, 'assigned': 0.4233, 'quarter': 0.3942 },
+  filter_operator: { 'equal to': 0.4684, 'greater than': 0.4281, 'less than': 0.3261 },
+  filter_value: { 'today': 0.7743, 'high': 0.3951, 'pending': 0.5588, 'q1': 0.3209 }
 };
 
+// Pre-calculated Gold→Ref2 Scores
+const GOLD_TO_REF2_SCORES = {
+  intent: { 'i want to': 0.7732, 'how do i': 0.5516 },
+  action: { 'create': 0.7006, 'modify': 0.7718, 'search': 0.6685, 'delete': 0.5458 },
+  process: { 'objective': 0.4323, 'key result': 0.2717, 'initiative': 0.4775, 'review meeting': 0.2810, 'key result checkin': 0.1245 },
+  filter_name: { 'due': 0.3741, 'priority': 0.4828, 'status': 0.6076, 'assigned': 0.3655, 'quarter': 0.3058 },
+  filter_operator: { 'equal to': 0.4684, 'greater than': 0.4281, 'less than': 0.3261 },
+  filter_value: { 'today': 0.8571, 'high': 0.7103, 'pending': 0.5231, 'q1': 0.3022 }
+};
+
+// Dictionaries
 const INTENT_DICTIONARY = {
   'menu': { primary: ['i would like to', 'i want to', 'i need to', 'i wish to', 'i intend to'], synonyms: [] },
-  'help': { primary: ['how do i', 'does the system support', 'is there capability to', 'where can i', "what's the best way to", "what's required to", "what's involved in", 'could you show me', 'can you guide me on', 'can you explain how to'], synonyms: [] }
+  'help': { primary: ['how do i', 'does the system support', 'is there capability to', 'where can i', "what's the best way to"], synonyms: [] }
 };
 
 const ACTION_DICTIONARY = {
@@ -94,7 +108,7 @@ const FILTER_VALUE_DICTIONARY = {
   'date': { primary: ['today', 'tomorrow', 'yesterday'], synonyms: [] },
   'priority': { primary: ['high', 'low', 'medium'], synonyms: [] },
   'status': { primary: ['pending', 'completed'], synonyms: ['done'] },
-  'quarter': { primary: ['q1', 'q2', 'q3', 'q4', 'quarter 1', 'quarter 2', 'quarter 3', 'quarter 4', '1', '2', '3', '4'], synonyms: [] }
+  'quarter': { primary: ['q1', 'q2', 'q3', 'q4', 'quarter 1', 'quarter 2', 'quarter 3', 'quarter 4'], synonyms: [] }
 };
 
 const INTENT_PHRASE_TO_CATEGORY = {
@@ -112,14 +126,14 @@ const PROCESS_REFERENCE_MAPPING = {
 
 const INTENT_PHRASE_DICTIONARY = {
   'menu': ["i'm looking to", "i'm trying to", 'i am preparing to', 'i am planning to', 'i am aiming to', 'i am hoping to', 'i feel ready to'],
-  'help': ['how to', 'does it have', 'show me how to', "what's the way to", 'what steps do i take to', 'how may i', 'how can i', 'could you explain how to', 'can you help me', "i'm looking to understand how to"]
+  'help': ['how to', 'does it have', 'show me how to', "what's the way to", 'what steps do i take to', 'how may i', 'how can i']
 };
 
 const ACTION_PHRASE_DICTIONARY = {
-  'create': ['add a record', 'enter a new record', 'input new data', 'make a new record', 'make an entry', 'open a new record', 'save new record', 'submit new record', 'insert a record', 'append a record'],
-  'modify': ['edit a record', 'update a record', 'change details', 'revise record', 'alter record', 'amend details', 'adjust details', 'modify record', 'correct record', 'make changes', 'make updates'],
-  'search': ['search records', 'look up data', 'find records', 'view records', 'open records', 'show records', 'show data', 'display records', 'browse records', 'list records', 'check records', 'inspect records', 'access records', 'retrieve records', 'pull records', 'load records', 'query records', 'fetch records'],
-  'delete': ['delete record', 'delete entry', 'remove record', 'remove entry', 'discard record', 'discard entry', 'erase record', 'purge record', 'purge entry', 'clear entry', 'drop entry', 'cancel entry', 'terminate entry', 'void entry', 'revoke entry']
+  'create': ['add a record', 'enter a new record', 'input new data', 'make a new record', 'make an entry', 'open a new record'],
+  'modify': ['edit a record', 'update a record', 'change details', 'revise record', 'alter record', 'amend details'],
+  'search': ['search records', 'look up data', 'find records', 'view records', 'open records', 'show records'],
+  'delete': ['delete record', 'delete entry', 'remove record', 'remove entry', 'discard record', 'discard entry']
 };
 
 const PROCESS_PHRASE_DICTIONARY = {
@@ -159,6 +173,7 @@ const FILTER_PATTERNS = [
   /for\s+(quarter|q)\s*(q?[1-4])/gi
 ];
 
+// Helper Functions
 function extractIntentText(userInput) {
   const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find'];
   for (const verb of actionVerbs) {
@@ -196,15 +211,11 @@ function extractActionText(userInput) {
   return '';
 }
 
+// SEQUENTIAL CIRCLE VALIDATION FUNCTION (with 4 Variables)
 async function performCircleValidation(searchText, category) {
-  console.log(`\n${'-'.repeat(80)}`);
-  console.log(`CIRCLE VALIDATION: ${category.toUpperCase()}`);
-  console.log(`Search Text: "${searchText}"`);
-  console.log(`${'-'.repeat(80)}`);
-
   const categoryMap = {
     'intent': 'intent', 'process': 'process', 'action': 'action',
-    'filter name': 'filter_name', 'filter operator': 'filter_operator', 'filter value': 'filter_value'
+    'filter_name': 'filter_name', 'filter_operator': 'filter_operator', 'filter_value': 'filter_value'
   };
 
   const qdrantCategory = categoryMap[category] || category;
@@ -213,21 +224,16 @@ async function performCircleValidation(searchText, category) {
     const results = await qdrantService.searchSimilar(searchText, qdrantCategory, 10, 0.0);
 
     if (!results || !results.match) {
-      console.log(`No Qdrant results found`);
       return { matched: false, gold_standard: null, clarity: null, variables: null, validation_path: 'NONE' };
     }
 
     const gold_standard = results.match;
     const new_to_gold_score = results.score;
 
-    console.log(`Top Match: "${gold_standard}" (${new_to_gold_score.toFixed(4)})`);
-
+    // CONDITION 1: Safety Floor Check
     if (new_to_gold_score < SAFETY_FLOOR) {
-      console.log(`Safety floor check FAILED`);
       return { matched: false, gold_standard, clarity: null, variables: null, validation_path: 'NONE' };
     }
-
-    console.log(`Safety floor check PASSED`);
 
     const variables = {
       variable1_new_value: searchText,
@@ -240,15 +246,11 @@ async function performCircleValidation(searchText, category) {
     const ref2_phrase = REFERENCE_MAPPINGS[qdrantCategory]?.ref2[gold_standard];
 
     if (!ref1_phrase || !ref2_phrase) {
-      console.log(`Reference phrases not found`);
       return { matched: false, gold_standard, clarity: null, variables: null, validation_path: 'NONE' };
     }
 
-    const gold_to_ref1_score = GOLD_TO_REF_SCORES[qdrantCategory]?.ref1[gold_standard] || 0;
-    const gold_to_ref2_score = GOLD_TO_REF_SCORES[qdrantCategory]?.ref2[gold_standard] || 0;
-
+    // CHECK 1: Distance to Gold Standard
     if (variables.variable2_distance_to_gold < MAX_DISTANCE_TO_GOLD) {
-      console.log(`CHECK 1 PASSED: Distance to Gold = ${variables.variable2_distance_to_gold.toFixed(4)}`);
       return {
         matched: true, gold_standard, clarity: 'Adequate Clarity',
         variables: { ...variables, variable3_distance_to_ref1: null, variable4_distance_to_ref2: null },
@@ -256,14 +258,13 @@ async function performCircleValidation(searchText, category) {
       };
     }
 
-    console.log(`CHECK 1 FAILED, trying REF1`);
-
+    // CHECK 2: Distance to Reference 1
     const ref1_results = await qdrantService.searchSimilar(ref1_phrase, qdrantCategory, 10, 0.0);
     const new_to_ref1_score = ref1_results.score || 0;
+    const gold_to_ref1_score = GOLD_TO_REF1_SCORES[qdrantCategory]?.[gold_standard] || 0;
     variables.variable3_distance_to_ref1 = Math.abs(new_to_ref1_score - gold_to_ref1_score);
 
     if (variables.variable3_distance_to_ref1 < MAX_DISTANCE_TO_REF1) {
-      console.log(`CHECK 2 PASSED: Distance to Ref1 = ${variables.variable3_distance_to_ref1.toFixed(4)}`);
       return {
         matched: true, gold_standard, clarity: 'Adequate Clarity',
         variables: { ...variables, variable4_distance_to_ref2: null },
@@ -271,14 +272,13 @@ async function performCircleValidation(searchText, category) {
       };
     }
 
-    console.log(`CHECK 2 FAILED, trying REF2`);
-
+    // CHECK 3: Distance to Reference 2
     const ref2_results = await qdrantService.searchSimilar(ref2_phrase, qdrantCategory, 10, 0.0);
     const new_to_ref2_score = ref2_results.score || 0;
+    const gold_to_ref2_score = GOLD_TO_REF2_SCORES[qdrantCategory]?.[gold_standard] || 0;
     variables.variable4_distance_to_ref2 = Math.abs(new_to_ref2_score - gold_to_ref2_score);
 
     if (variables.variable4_distance_to_ref2 < MAX_DISTANCE_TO_REF2) {
-      console.log(`CHECK 3 PASSED: Distance to Ref2 = ${variables.variable4_distance_to_ref2.toFixed(4)}`);
       return {
         matched: true, gold_standard, clarity: 'Adequate Clarity',
         variables,
@@ -286,15 +286,15 @@ async function performCircleValidation(searchText, category) {
       };
     }
 
-    console.log(`All checks FAILED`);
     return { matched: false, gold_standard, clarity: null, variables, validation_path: 'NONE' };
 
   } catch (error) {
-    console.error(`Error in validation: ${error.message}`);
+    console.error(`Validation error: ${error.message}`);
     return { matched: false, gold_standard: null, clarity: null, variables: null, validation_path: 'NONE' };
   }
 }
 
+// Conversation Analyzer Class
 class ConversationAnalyzer {
   constructor() {
     this.reset();
@@ -302,13 +302,22 @@ class ConversationAnalyzer {
 
   reset() {
     this.analysis = {
-      userInput: '', intent: { status: 'Not Found', value: '', reply: '' },
+      userInput: '',
+      intent: { status: 'Not Found', value: '', reply: '' },
       process: { status: 'Not Found', value: '', reply: '' },
       action: { status: 'Not Found', value: '', reply: '' },
       filters: { status: 'Not Found', value: [], reply: '' },
-      finalAnalysis: '', suggested_action: '', example_query: '',
-      proceed_button: false, redirect_flag: false, redirect_url: null,
-      step1_reply: '', step2_reply: '', step3_reply: '', step4_reply: '', validation_logs: []
+      finalAnalysis: '',
+      suggested_action: '',
+      example_query: '',
+      proceed_button: false,
+      redirect_flag: false,
+      redirect_url: null,
+      step1_reply: '',
+      step2_reply: '',
+      step3_reply: '',
+      step4_reply: '',
+      validation_logs: []
     };
   }
 
@@ -325,6 +334,7 @@ class ConversationAnalyzer {
     const input = userInput.toLowerCase().trim();
     let intentFound = false;
 
+    // 1.1 Programmatic Check (Primary/Synonym)
     for (const [intent, patterns] of Object.entries(INTENT_DICTIONARY)) {
       for (const pattern of [...patterns.primary, ...patterns.synonyms]) {
         if (input.includes(pattern.toLowerCase())) {
@@ -337,6 +347,7 @@ class ConversationAnalyzer {
       if (intentFound) break;
     }
 
+    // 1.2 Programmatic Check (Phrase Dictionary)
     if (!intentFound) {
       for (const [intent, phrases] of Object.entries(INTENT_PHRASE_DICTIONARY)) {
         for (const phrase of phrases) {
@@ -351,6 +362,7 @@ class ConversationAnalyzer {
       }
     }
 
+    // 1.3 Qdrant Vector Similarity Search (Sequential Circle Validation)
     if (!intentFound) {
       const searchText = extractIntentText(input);
       const validation_result = await performCircleValidation(searchText, 'intent');
@@ -366,16 +378,15 @@ class ConversationAnalyzer {
             validation_path: validation_result.validation_path, acceptance_status: 'ACCEPTED'
           });
         }
-      } else {
-        if (validation_result.variables) {
-          this.analysis.validation_logs.push({
-            component_type: 'intent', ...validation_result.variables,
-            validation_path: validation_result.validation_path, acceptance_status: 'REJECTED'
-          });
-        }
+      } else if (validation_result.variables) {
+        this.analysis.validation_logs.push({
+          component_type: 'intent', ...validation_result.variables,
+          validation_path: validation_result.validation_path, acceptance_status: 'REJECTED'
+        });
       }
     }
 
+    // 1.4 No Intent Detected
     if (!intentFound) {
       if (this.hasAnyKeywords(input)) {
         this.analysis.intent = { status: 'Not Clear', value: '', reply: 'Unable to determine your intent.' };
@@ -391,6 +402,7 @@ class ConversationAnalyzer {
     const input = userInput.toLowerCase().trim();
     let processFound = false;
 
+    // 2.1 Programmatic Check (Primary/Synonym)
     for (const [process, patterns] of Object.entries(PROCESS_DICTIONARY)) {
       for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
         if (input === keyword.toLowerCase() || input.includes(keyword.toLowerCase())) {
@@ -403,6 +415,7 @@ class ConversationAnalyzer {
       if (processFound) break;
     }
 
+    // 2.2 Programmatic Check (Phrase Dictionary)
     if (!processFound) {
       for (const [process, phrases] of Object.entries(PROCESS_PHRASE_DICTIONARY)) {
         for (const phrase of phrases) {
@@ -417,6 +430,7 @@ class ConversationAnalyzer {
       }
     }
 
+    // 2.3 Qdrant Vector Similarity Search (Sequential Circle Validation)
     if (!processFound) {
       const searchText = extractProcessText(input);
       if (searchText) {
@@ -428,27 +442,28 @@ class ConversationAnalyzer {
           if (validation_result.variables) {
             this.analysis.validation_logs.push({ component_type: 'process', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'ACCEPTED' });
           }
-        } else {
-          if (validation_result.variables) {
-            this.analysis.validation_logs.push({ component_type: 'process', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'REJECTED' });
-          }
+        } else if (validation_result.variables) {
+          this.analysis.validation_logs.push({ component_type: 'process', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'REJECTED' });
         }
       }
     }
 
+    // 2.4 No Process Detected
     if (!processFound) {
       this.analysis.process = { status: 'Not Found', value: '', reply: 'No process detected.' };
       this.analysis.step2_reply = 'No process detected.';
     }
   }
 
+  // 2.5 Help Intent Redirect Check
   checkHelpRedirect() {
     const intentCategory = this.analysis.intent.value;
     const intentStatus = this.analysis.intent.status;
     const processValue = this.analysis.process.value;
     const processStatus = this.analysis.process.status;
 
-    if (intentCategory === 'help' && (intentStatus === 'Clear' || intentStatus === 'Adequate Clarity') &&
+    if (intentCategory === 'help' && 
+        (intentStatus === 'Clear' || intentStatus === 'Adequate Clarity') &&
         (processStatus === 'Clear' || processStatus === 'Adequate Clarity')) {
       const redirect_url = PROCESS_REFERENCE_MAPPING[processValue];
       if (redirect_url) {
@@ -466,6 +481,7 @@ class ConversationAnalyzer {
     const input = userInput.toLowerCase().trim();
     let actionFound = false;
 
+    // 3.1 Programmatic Check (Primary/Synonym)
     for (const [action, patterns] of Object.entries(ACTION_DICTIONARY)) {
       for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
         if (input.includes(keyword.toLowerCase())) {
@@ -478,6 +494,7 @@ class ConversationAnalyzer {
       if (actionFound) break;
     }
 
+    // 3.2 Programmatic Check (Phrase Dictionary)
     if (!actionFound) {
       for (const [action, phrases] of Object.entries(ACTION_PHRASE_DICTIONARY)) {
         for (const phrase of phrases) {
@@ -492,6 +509,7 @@ class ConversationAnalyzer {
       }
     }
 
+    // 3.3 Qdrant Vector Similarity Search (Sequential Circle Validation)
     if (!actionFound) {
       const searchText = extractActionText(input);
       if (searchText) {
@@ -503,14 +521,13 @@ class ConversationAnalyzer {
           if (validation_result.variables) {
             this.analysis.validation_logs.push({ component_type: 'action', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'ACCEPTED' });
           }
-        } else {
-          if (validation_result.variables) {
-            this.analysis.validation_logs.push({ component_type: 'action', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'REJECTED' });
-          }
+        } else if (validation_result.variables) {
+          this.analysis.validation_logs.push({ component_type: 'action', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'REJECTED' });
         }
       }
     }
 
+    // 3.4 No Action Detected
     if (!actionFound) {
       this.analysis.action = { status: 'Not Found', value: '', reply: 'No action detected.' };
       this.analysis.step3_reply = 'No action detected.';
@@ -522,14 +539,15 @@ class ConversationAnalyzer {
     const intentCategory = this.analysis.intent.value;
     const actionValue = this.analysis.action.value;
 
+    // 4.1 Check Filter Applicability
     if (intentCategory !== 'menu' || (actionValue !== 'modify' && actionValue !== 'search')) {
       this.analysis.filters = { status: 'Not Applicable', value: [], reply: 'Filters not applicable.' };
       this.analysis.step4_reply = 'Filters not applicable.';
       return;
     }
 
+    // 4.2 Detect Filters Using Regex Patterns
     const detectedFilters = [];
-
     for (const pattern of FILTER_PATTERNS) {
       let match;
       while ((match = pattern.exec(input)) !== null) {
@@ -556,6 +574,7 @@ class ConversationAnalyzer {
       return;
     }
 
+    // Process each filter
     for (let i = 0; i < detectedFilters.length; i++) {
       const filter = detectedFilters[i];
       await this.analyzeFilterComponent(filter, 'name', 'filter_name', FILTER_NAME_DICTIONARY, FILTER_NAME_PHRASE_DICTIONARY);
@@ -595,6 +614,7 @@ class ConversationAnalyzer {
     const statusKey = `${componentKey}_status`;
     let found = false;
 
+    // Programmatic Check (Primary/Synonym)
     for (const [standardValue, patterns] of Object.entries(dictionary)) {
       for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
         if (componentValue === keyword.toLowerCase() || componentValue.includes(keyword.toLowerCase())) {
@@ -607,6 +627,7 @@ class ConversationAnalyzer {
       if (found) break;
     }
 
+    // Programmatic Check (Phrase Dictionary)
     if (!found && phraseDictionary) {
       for (const [standardValue, phrases] of Object.entries(phraseDictionary)) {
         for (const phrase of phrases) {
@@ -621,6 +642,7 @@ class ConversationAnalyzer {
       }
     }
 
+    // Qdrant Circle Validation (Sequential)
     if (!found) {
       const validation_result = await performCircleValidation(componentValue, category);
 
@@ -634,13 +656,11 @@ class ConversationAnalyzer {
             validation_path: validation_result.validation_path, acceptance_status: 'ACCEPTED'
           });
         }
-      } else {
-        if (validation_result.variables) {
-          this.analysis.validation_logs.push({
-            component_type: category, ...validation_result.variables,
-            validation_path: validation_result.validation_path, acceptance_status: 'REJECTED'
-          });
-        }
+      } else if (validation_result.variables) {
+        this.analysis.validation_logs.push({
+          component_type: category, ...validation_result.variables,
+          validation_path: validation_result.validation_path, acceptance_status: 'REJECTED'
+        });
       }
     }
 
@@ -718,6 +738,7 @@ class ConversationAnalyzer {
   }
 }
 
+// API Endpoints
 app.post('/api/analyze', async (req, res) => {
   try {
     const { sentence } = req.body;
@@ -764,23 +785,25 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Server Startup
 app.listen(PORT, async () => {
-  console.log(`\n${'-'.repeat(80)}`);
+  console.log(`\n${'='.repeat(80)}`);
   console.log(`SERVER STARTING`);
   console.log(`Port: ${PORT}`);
-  console.log(`${'-'.repeat(80)}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`${'='.repeat(80)}`);
   
   try {
     console.log('Initializing Qdrant service...');
     await qdrantService.initialize();
-    console.log('Qdrant service initialized successfully');
+    console.log('✓ Qdrant service initialized successfully');
     console.log(`Safety Floor: ${SAFETY_FLOOR}`);
     console.log(`Max Distance to Gold: ${MAX_DISTANCE_TO_GOLD}`);
     console.log(`Max Distance to Ref1: ${MAX_DISTANCE_TO_REF1}`);
     console.log(`Max Distance to Ref2: ${MAX_DISTANCE_TO_REF2}`);
-    console.log(`${'-'.repeat(80)}\n`);
+    console.log(`${'='.repeat(80)}\n`);
   } catch (error) {
-    console.error('Failed to initialize Qdrant service:', error);
+    console.error('Failed to initialize Qdrant service:', error.message);
     console.log('Server is running but Qdrant service is not ready');
   }
 });
