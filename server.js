@@ -242,12 +242,27 @@ function extractProcessText(userInput) {
   return '';
 }
 
+// FIXED: Find the earliest verb in the sentence, not just the first in array order
 function extractActionText(userInput) {
   const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find', 'generate', 'change', 'locate', 'erase'];
+  const lowerInput = userInput.toLowerCase();
+  
+  let earliestPosition = -1;
+  let foundVerb = '';
+  
+  // Find which verb appears FIRST in the sentence
   for (const verb of actionVerbs) {
-    if (userInput.toLowerCase().includes(verb)) return verb;
+    const position = lowerInput.indexOf(verb);
+    if (position !== -1) {
+      // If this verb appears and is earlier than previous matches, use it
+      if (earliestPosition === -1 || position < earliestPosition) {
+        earliestPosition = position;
+        foundVerb = verb;
+      }
+    }
   }
-  return '';
+  
+  return foundVerb;
 }
 
 // ========== SEQUENTIAL CIRCLE VALIDATION FUNCTION ==========
@@ -917,7 +932,7 @@ class ConversationAnalyzer {
 
 // ========== REQUEST LOGGING MIDDLEWARE ==========
 app.use((req, res, next) => {
-  console.log(`📍 ${new Date().toISOString()} - ${req.method} ${req.path}`);
+  console.log(`📋 ${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
 
@@ -1081,16 +1096,16 @@ app.listen(PORT, async () => {
   try {
     console.log('Initializing Qdrant service...');
     await qdrantService.initialize();
-    console.log('✓ Qdrant service initialized successfully');
+    console.log('✔ Qdrant service initialized successfully');
     console.log(`Safety Floor: ${SAFETY_FLOOR}`);
     console.log(`Max Distance to Gold: ${MAX_DISTANCE_TO_GOLD}`);
     console.log(`Max Distance to Ref1: ${MAX_DISTANCE_TO_REF1}`);
     console.log(`Max Distance to Ref2: ${MAX_DISTANCE_TO_REF2}`);
     console.log(`${'='.repeat(80)}\n`);
     console.log(`🚀 Server is ready and listening on port ${PORT}`);
-    console.log(`📍 Health check: http://localhost:${PORT}/health`);
-    console.log(`📍 Qdrant status: http://localhost:${PORT}/qdrant-status`);
-    console.log(`📍 API endpoint: http://localhost:${PORT}/analyze`);
+    console.log(`🔍 Health check: http://localhost:${PORT}/health`);
+    console.log(`🔍 Qdrant status: http://localhost:${PORT}/qdrant-status`);
+    console.log(`🔍 API endpoint: http://localhost:${PORT}/analyze`);
     console.log(`${'='.repeat(80)}\n`);
   } catch (error) {
     console.error('❌ Failed to initialize Qdrant service:', error.message);
