@@ -44,11 +44,6 @@
             border-bottom: 2px solid #e2e8f0;
         }
 
-        .section-header svg {
-            width: 24px;
-            height: 24px;
-        }
-
         label {
             display: block;
             margin-bottom: 10px;
@@ -84,15 +79,11 @@
             margin-top: 8px;
         }
 
-        .char-count svg {
-            width: 16px;
-            height: 16px;
-        }
-
         .button-group {
             display: flex;
             gap: 12px;
             margin-top: 20px;
+            flex-wrap: wrap;
         }
 
         button {
@@ -109,13 +100,17 @@
             gap: 8px;
         }
 
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         .analyze-btn {
             background: #1e3a8a;
             color: white;
-            flex: 0 0 auto;
         }
 
-        .analyze-btn:hover {
+        .analyze-btn:hover:not(:disabled) {
             background: #1e40af;
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
@@ -124,10 +119,9 @@
         .proceed-btn {
             background: #16a34a;
             color: white;
-            flex: 0 0 auto;
         }
 
-        .proceed-btn:hover {
+        .proceed-btn:hover:not(:disabled) {
             background: #15803d;
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
@@ -136,12 +130,36 @@
         .clear-btn {
             background: #64748b;
             color: white;
-            flex: 0 0 auto;
         }
 
-        .clear-btn:hover {
+        .clear-btn:hover:not(:disabled) {
             background: #475569;
             transform: translateY(-1px);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         .result-box {
@@ -149,7 +167,17 @@
             border-left: 4px solid #f59e0b;
             border-radius: 8px;
             padding: 16px;
-            margin-bottom: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .result-box.show {
+            display: block;
+        }
+
+        .result-box.success {
+            background: #dcfce7;
+            border-left-color: #16a34a;
         }
 
         .result-title {
@@ -158,9 +186,17 @@
             margin-bottom: 8px;
         }
 
+        .result-box.success .result-title {
+            color: #15803d;
+        }
+
         .result-text {
             color: #92400e;
             line-height: 1.6;
+        }
+
+        .result-box.success .result-text {
+            color: #166534;
         }
 
         .suggestion-box {
@@ -169,6 +205,10 @@
             border-radius: 8px;
             padding: 12px;
             margin-top: 12px;
+            display: none;
+        }
+
+        .suggestion-box.show {
             display: flex;
             align-items: start;
             gap: 8px;
@@ -184,6 +224,10 @@
             border-radius: 8px;
             padding: 12px;
             margin-top: 12px;
+            display: none;
+        }
+
+        .example-box.show {
             display: flex;
             align-items: start;
             gap: 8px;
@@ -222,6 +266,42 @@
             font-weight: 500;
         }
 
+        .detail-status {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .history-header .section-header {
+            margin: 0;
+            border: none;
+            padding: 0;
+        }
+
+        .refresh-btn {
+            background: #3b82f6;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .refresh-btn:hover:not(:disabled) {
+            background: #2563eb;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -257,24 +337,40 @@
             border-bottom: none;
         }
 
-        .history-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #94a3b8;
         }
 
-        .refresh-btn {
-            background: #3b82f6;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 600;
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
         }
 
-        .refresh-btn:hover {
-            background: #2563eb;
+        .status-clear {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-adequate {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .status-notfound {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .text-truncate {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
     </style>
 </head>
@@ -283,62 +379,76 @@
         <!-- Query Input Section -->
         <div class="section">
             <div class="section-header">
-                ⌨️ Enter Your Query
+                Enter Your Query
             </div>
             
             <label for="userInput">Input Sentence</label>
             <textarea 
                 id="userInput" 
-                placeholder="I'm seeking to create an objective"
+                placeholder="I want to create an objective"
+                maxlength="500"
             ></textarea>
             <div class="char-count">
-                ⓘ Character count: <span id="charCount">0</span>/500
+                Character count: <span id="charCount">0</span>/500
             </div>
 
             <div class="button-group">
-                <button class="analyze-btn" onclick="analyzeIntent()">
-                    🔍 Analyze Intent
+                <button class="analyze-btn" id="analyzeBtn" onclick="analyzeIntent()">
+                    Analyze Intent
                 </button>
-                <button class="proceed-btn" id="proceedBtn" style="display:none;">
-                    ➜ Proceed
+                <button class="proceed-btn" id="proceedBtn" onclick="proceedAction()" style="display:none;">
+                    Proceed
                 </button>
                 <button class="clear-btn" onclick="clearInput()">
-                    ☁️ Clear
+                    Clear
                 </button>
             </div>
 
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <div>Analyzing...</div>
+            </div>
+
             <!-- Analysis Result -->
-            <div id="resultBox" style="display:none; margin-top: 20px;">
-                <div class="result-box">
-                    <div class="result-title">Analysis Result:</div>
-                    <div class="result-text" id="analysisText"></div>
+            <div id="resultBox" class="result-box">
+                <div class="result-title">Analysis Result:</div>
+                <div class="result-text" id="analysisText"></div>
+                <div id="suggestionBox" class="suggestion-box">
+                    <span>💡</span>
+                    <div id="suggestionContent"></div>
                 </div>
-                <div id="suggestionBox" style="display:none;"></div>
-                <div id="exampleBox" style="display:none;"></div>
+                <div id="exampleBox" class="example-box">
+                    <span>📋</span>
+                    <div id="exampleContent"></div>
+                </div>
             </div>
         </div>
 
         <!-- Detailed Analysis Section -->
         <div class="section" id="detailsSection" style="display:none;">
             <div class="section-header">
-                📊 Detailed Analysis
+                Detailed Analysis
             </div>
             <div class="details-grid">
                 <div class="detail-card">
                     <div class="detail-label">Intent</div>
                     <div class="detail-value" id="intentDetail">-</div>
+                    <div class="detail-status" id="intentStatus"></div>
                 </div>
                 <div class="detail-card">
                     <div class="detail-label">Process</div>
                     <div class="detail-value" id="processDetail">-</div>
+                    <div class="detail-status" id="processStatus"></div>
                 </div>
                 <div class="detail-card">
                     <div class="detail-label">Action</div>
                     <div class="detail-value" id="actionDetail">-</div>
+                    <div class="detail-status" id="actionStatus"></div>
                 </div>
                 <div class="detail-card">
                     <div class="detail-label">Filters</div>
                     <div class="detail-value" id="filtersDetail">-</div>
+                    <div class="detail-status" id="filtersStatus"></div>
                 </div>
             </div>
         </div>
@@ -346,33 +456,31 @@
         <!-- Analysis History Section -->
         <div class="section">
             <div class="history-header">
-                <div class="section-header" style="margin: 0; border: none; padding: 0;">
-                    📜 Analysis History
+                <div class="section-header">
+                    Analysis History
                 </div>
                 <button class="refresh-btn" onclick="loadAnalysisHistory()">
-                    🔄 Refresh
+                    Refresh
                 </button>
             </div>
             
-            <div style="overflow-x: auto;">
+            <div class="table-wrapper">
                 <table>
                     <thead>
                         <tr>
                             <th>ID</th>
+                            <th>Input</th>
                             <th>Intent</th>
                             <th>Process</th>
                             <th>Action</th>
                             <th>Filters</th>
                             <th>Final Analysis</th>
-                            <th>Suggested Action</th>
-                            <th>Example Query</th>
-                            <th>Proceed</th>
                             <th>Timestamp</th>
                         </tr>
                     </thead>
                     <tbody id="historyBody">
                         <tr>
-                            <td colspan="10" style="text-align: center; padding: 30px; color: #94a3b8;">
+                            <td colspan="8" class="empty-state">
                                 No analysis history yet. Analyze a sentence to see results here.
                             </td>
                         </tr>
@@ -383,17 +491,14 @@
     </div>
 
     <script>
+        let currentAnalysis = null;
+
         // Character counter
         const userInput = document.getElementById('userInput');
         const charCount = document.getElementById('charCount');
         
         userInput.addEventListener('input', function() {
-            const count = this.value.length;
-            charCount.textContent = count;
-            if (count > 500) {
-                this.value = this.value.substring(0, 500);
-                charCount.textContent = '500';
-            }
+            charCount.textContent = this.value.length;
         });
 
         // Analyze Intent
@@ -401,172 +506,177 @@
             const sentence = userInput.value.trim();
             
             if (!sentence) {
-                alert('⚠️ Please enter a sentence to analyze.');
+                alert('Please enter a sentence to analyze.');
                 return;
             }
 
-            try {
-                const resultBox = document.getElementById('resultBox');
-                const analysisText = document.getElementById('analysisText');
-                const detailsSection = document.getElementById('detailsSection');
-                
-                resultBox.style.display = 'block';
-                detailsSection.style.display = 'none';
-                analysisText.textContent = 'Analyzing your input...';
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('analyzeBtn').disabled = true;
 
-                const response = await fetch('/analyze', {
+            try {
+                const response = await fetch('/api/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ sentence: sentence })
                 });
 
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
                 const data = await response.json();
-                displayResults(data);
-                await loadAnalysisHistory();
+                
+                if (data.success && data.analysis) {
+                    currentAnalysis = data.analysis;
+                    displayResults(data.analysis);
+                    await loadAnalysisHistory();
+                } else {
+                    throw new Error(data.error || 'Analysis failed');
+                }
 
             } catch (error) {
                 console.error('Error:', error);
-                document.getElementById('analysisText').textContent = `Error: ${error.message}`;
+                document.getElementById('resultBox').classList.add('show');
+                document.getElementById('analysisText').textContent = 'Error: ' + error.message;
+            } finally {
+                document.getElementById('loading').classList.remove('show');
+                document.getElementById('analyzeBtn').disabled = false;
             }
         }
 
         // Display Results
-        function displayResults(data) {
+        function displayResults(analysis) {
+            const resultBox = document.getElementById('resultBox');
             const analysisText = document.getElementById('analysisText');
             const suggestionBox = document.getElementById('suggestionBox');
             const exampleBox = document.getElementById('exampleBox');
-            const intentDetail = document.getElementById('intentDetail');
-            const processDetail = document.getElementById('processDetail');
-            const actionDetail = document.getElementById('actionDetail');
-            const filtersDetail = document.getElementById('filtersDetail');
             const proceedBtn = document.getElementById('proceedBtn');
             const detailsSection = document.getElementById('detailsSection');
 
-            // Handle analysis text
-            let analysisTextContent = '';
-            if (typeof data.analysis === 'string') {
-                analysisTextContent = data.analysis;
-            } else if (typeof data.analysis === 'object' && data.analysis !== null) {
-                analysisTextContent = data.analysis.finalAnalysis || data.analysis.message || JSON.stringify(data.analysis);
+            // Display main analysis
+            analysisText.textContent = analysis.finalAnalysis || 'Analysis completed';
+
+            // Display suggestion
+            if (analysis.suggested_action) {
+                document.getElementById('suggestionContent').innerHTML = '<strong>Suggestion:</strong> ' + analysis.suggested_action;
+                suggestionBox.classList.add('show');
             } else {
-                analysisTextContent = data.message || 'Analysis completed';
+                suggestionBox.classList.remove('show');
             }
 
-            analysisText.textContent = analysisTextContent;
-
-            // Handle suggestion
-            if (data.suggestion || (data.analysis && data.analysis.suggested_action)) {
-                const suggestionText = data.suggestion || data.analysis.suggested_action;
-                suggestionBox.innerHTML = `
-                    <div class="suggestion-box">
-                        <span>💡</span>
-                        <div><strong>Suggestion:</strong> ${suggestionText}</div>
-                    </div>
-                `;
-                suggestionBox.style.display = 'block';
+            // Display example
+            if (analysis.example_query) {
+                document.getElementById('exampleContent').innerHTML = '<strong>Example:</strong> ' + analysis.example_query;
+                exampleBox.classList.add('show');
             } else {
-                suggestionBox.style.display = 'none';
+                exampleBox.classList.remove('show');
             }
 
-            // Handle example
-            if (data.example || (data.analysis && data.analysis.example_query)) {
-                const exampleText = data.example || data.analysis.example_query;
-                exampleBox.innerHTML = `
-                    <div class="example-box">
-                        <span>📋</span>
-                        <div><strong>Example:</strong> ${exampleText}</div>
-                    </div>
-                `;
-                exampleBox.style.display = 'block';
+            // Show result box
+            resultBox.classList.add('show');
+            if (analysis.proceed_button) {
+                resultBox.classList.add('success');
             } else {
-                exampleBox.style.display = 'none';
+                resultBox.classList.remove('success');
             }
 
             // Show detailed analysis
             detailsSection.style.display = 'block';
+            document.getElementById('intentDetail').textContent = analysis.intent?.value || '-';
+            document.getElementById('intentStatus').textContent = analysis.intent?.status || '';
+            document.getElementById('processDetail').textContent = analysis.process?.value || '-';
+            document.getElementById('processStatus').textContent = analysis.process?.status || '';
+            document.getElementById('actionDetail').textContent = analysis.action?.value || '-';
+            document.getElementById('actionStatus').textContent = analysis.action?.status || '';
+            document.getElementById('filtersDetail').textContent = analysis.filters?.status || '-';
+            document.getElementById('filtersStatus').textContent = '(' + (analysis.filters?.value?.length || 0) + ' filters)';
 
-            // Handle nested data structure
-            if (data.analysis && typeof data.analysis === 'object') {
-                intentDetail.textContent = data.analysis.intent?.value || data.analysis.intent?.status || 'Unknown';
-                processDetail.textContent = data.analysis.process?.value || data.analysis.process?.status || 'Unknown';
-                actionDetail.textContent = data.analysis.action?.value || data.analysis.action?.status || 'Unknown';
-                filtersDetail.textContent = data.analysis.filters?.status || 'Not Applicable';
-            } else {
-                intentDetail.textContent = data.intent?.status || data.intent || 'Unknown';
-                processDetail.textContent = data.process?.status || data.process || 'Unknown';
-                actionDetail.textContent = data.action?.status || data.action || 'Unknown';
-                filtersDetail.textContent = data.filters?.status || data.filters || 'Not Applicable';
-            }
-
-            // Handle proceed button
-            const showProceed = data.proceedButton || (data.analysis && data.analysis.proceed_button);
-            proceedBtn.style.display = showProceed ? 'flex' : 'none';
+            // Show/hide proceed button
+            proceedBtn.style.display = analysis.proceed_button ? 'flex' : 'none';
 
             // Handle redirect
-            const redirectFlag = data.redirectFlag || (data.analysis && data.analysis.redirect_flag);
-            const redirectURL = data.redirectURL || (data.analysis && data.analysis.redirect_url);
-            
-            if (redirectFlag && redirectURL) {
-                setTimeout(() => {
-                    //if (confirm('Redirecting to help documentation. Continue?')) {
-                        window.location.href = redirectURL;
-                    //}
-                }, 1000);
+            if (analysis.redirect_flag && analysis.redirect_url) {
+                setTimeout(function() {
+                    window.location.href = analysis.redirect_url;
+                }, 1500);
+            }
+        }
+
+        // Proceed Action
+        function proceedAction() {
+            if (currentAnalysis) {
+                const summary = 'Proceeding with:\n\n' +
+                    'Intent: ' + currentAnalysis.intent?.value + '\n' +
+                    'Process: ' + currentAnalysis.process?.value + '\n' +
+                    'Action: ' + currentAnalysis.action?.value + '\n' +
+                    'Filters: ' + (currentAnalysis.filters?.value?.length || 0) + '\n\n' +
+                    currentAnalysis.finalAnalysis;
+                alert(summary);
             }
         }
 
         // Load Analysis History
         async function loadAnalysisHistory() {
             try {
-                const response = await fetch('/api/history');
-                const history = await response.json();
+                const response = await fetch('/api/logs');
+                const data = await response.json();
                 
                 const tbody = document.getElementById('historyBody');
-                tbody.innerHTML = '';
-
-                if (!history || history.length === 0) {
-                    tbody.innerHTML = `
-                        <tr>
-                            <td colspan="10" style="text-align: center; padding: 30px; color: #94a3b8;">
-                                No analysis history yet. Analyze a sentence to see results here.
-                            </td>
-                        </tr>
-                    `;
+                
+                if (!data.success || !data.logs || data.logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No analysis history yet. Analyze a sentence to see results here.</td></tr>';
                     return;
                 }
 
-                history.forEach(entry => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${entry.id || '-'}</td>
-                        <td>${entry.intent || '-'}</td>
-                        <td>${entry.process || '-'}</td>
-                        <td>${entry.action || '-'}</td>
-                        <td>${entry.filters || '-'}</td>
-                        <td>${entry.finalAnalysis || '-'}</td>
-                        <td>${entry.suggestedAction || '-'}</td>
-                        <td>${entry.exampleQuery || '-'}</td>
-                        <td>${entry.proceedButton ? 'Yes' : 'No'}</td>
-                        <td>${new Date(entry.timestamp).toLocaleString()}</td>
-                    `;
-                    tbody.appendChild(row);
-                });
+                tbody.innerHTML = data.logs.map(function(log, index) {
+                    const analysis = log.analysis;
+                    const inputText = log.sentence.length > 40 ? log.sentence.substring(0, 40) + '...' : log.sentence;
+                    const finalAnalysisText = analysis.finalAnalysis.length > 50 ? analysis.finalAnalysis.substring(0, 50) + '...' : analysis.finalAnalysis;
+                    const timestamp = new Date(log.timestamp).toLocaleString();
+                    const filterCount = analysis.filters?.value?.length || 0;
+                    const intentStatus = getStatusClass(analysis.intent?.status);
+                    const processStatus = getStatusClass(analysis.process?.status);
+                    const actionStatus = getStatusClass(analysis.action?.status);
+
+                    return '<tr>' +
+                        '<td>' + (index + 1) + '</td>' +
+                        '<td class="text-truncate">' + inputText + '</td>' +
+                        '<td><span class="status-badge status-' + intentStatus + '">' + (analysis.intent?.value || '-') + '</span></td>' +
+                        '<td><span class="status-badge status-' + processStatus + '">' + (analysis.process?.value || '-') + '</span></td>' +
+                        '<td><span class="status-badge status-' + actionStatus + '">' + (analysis.action?.value || '-') + '</span></td>' +
+                        '<td>' + filterCount + '</td>' +
+                        '<td class="text-truncate">' + finalAnalysisText + '</td>' +
+                        '<td>' + timestamp + '</td>' +
+                        '</tr>';
+                }).join('');
+
             } catch (error) {
                 console.error('Error loading history:', error);
+                document.getElementById('historyBody').innerHTML = '<tr><td colspan="8" class="empty-state">Error loading history. Please try again.</td></tr>';
             }
+        }
+
+        function getStatusClass(status) {
+            if (!status) return 'notfound';
+            if (status.indexOf('Clear') !== -1) return 'clear';
+            if (status.indexOf('Adequate') !== -1) return 'adequate';
+            return 'notfound';
         }
 
         // Clear Input
         function clearInput() {
             userInput.value = '';
             charCount.textContent = '0';
-            document.getElementById('resultBox').style.display = 'none';
+            document.getElementById('resultBox').classList.remove('show');
             document.getElementById('detailsSection').style.display = 'none';
             document.getElementById('proceedBtn').style.display = 'none';
+            currentAnalysis = null;
         }
 
         // Load history on page load
-        window.addEventListener('load', loadAnalysisHistory);
+        window.addEventListener('load', function() {
+            loadAnalysisHistory();
+        });
     </script>
 </body>
 </html>
