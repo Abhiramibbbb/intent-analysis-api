@@ -211,6 +211,18 @@ function extractProcessText(userInput) {
   
   if (earliestPosition >= 0) {
     let afterVerb = userInput.substring(earliestPosition + foundVerb.length).trim();
+    
+    // List of known multi-word processes to match completely
+    const multiWordProcesses = ['key result checkin', 'review meeting', 'key result'];
+    
+    // Try to match multi-word processes first
+    for (const process of multiWordProcesses) {
+      if (afterVerb.toLowerCase().startsWith(process)) {
+        return process;
+      }
+    }
+    
+    // Otherwise, extract until filter keywords
     const filterKeywords = ['with', 'where', 'having', 'for'];
     for (const keyword of filterKeywords) {
       const keywordPos = afterVerb.toLowerCase().indexOf(keyword);
