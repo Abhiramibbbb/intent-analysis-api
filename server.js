@@ -10,9 +10,9 @@ const PORT = process.env.PORT || 3000;
 
 // Constants from Pseudocode
 const SAFETY_FLOOR = 0.30;
-const MAX_DISTANCE_TO_GOLD = 0.3;
-const MAX_DISTANCE_TO_REF1 = 0.2;
-const MAX_DISTANCE_TO_REF2 = 0.1;
+const MAX_DISTANCE_TO_GOLD = 0.50;
+const MAX_DISTANCE_TO_REF1 = 0.4;
+const MAX_DISTANCE_TO_REF2 = 0.3;
 
 const logs = [];
 
@@ -495,7 +495,44 @@ class ConversationAnalyzer {
     }
 
     if (!processFound) {
-      const searchText = extractProcessText(input);
+      let searchText = extractProcessText(input);
+      
+      if (!searchText) {
+        const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find'];
+        const lowerInput = input.toLowerCase();
+        let earliestPosition = -1;
+        
+        for (const verb of actionVerbs) {
+          const position = lowerInput.indexOf(verb);
+          if (position !== -1) {
+            if (earliestPosition === -1 || position < earliestPosition) {
+              earliestPosition = position;
+            }
+          }
+        }
+        
+        if (earliestPosition !== -1) {
+          let afterAction = input.substring(earliestPosition).trim();
+          const match = afterAction.match(/\b(create|modify|update|search|delete|add|remove|find)\b/i);
+          if (match) {
+            const verbLength = match[0].length;
+            const afterVerb = afterAction.substring(afterAction.toLowerCase().indexOf(match[0]) + verbLength).trim();
+            const filterKeywords = ['with', 'where', 'having', 'for'];
+            let finalText = afterVerb;
+            
+            for (const keyword of filterKeywords) {
+              const keywordPos = finalText.toLowerCase().indexOf(keyword);
+              if (keywordPos >= 0) {
+                finalText = finalText.substring(0, keywordPos).trim();
+                break;
+              }
+            }
+            
+            searchText = finalText || afterVerb;
+          }
+        }
+      }
+      
       if (searchText) {
         const validation_result = await performCircleValidation(searchText, 'process');
         if (validation_result.matched) {
@@ -574,16 +611,29 @@ class ConversationAnalyzer {
       const searchText = extractActionText(input);
       let validationSearchText = searchText;
       if (!validationSearchText) {
-        const intentKeywords = ['i want to', 'i need to', 'how do i', 'i am seeking to', 'i would like to', 'i am planning to', 'i am trying to'];
-        for (const keyword of intentKeywords) {
-          const pos = input.indexOf(keyword);
-          if (pos >= 0) {
-            validationSearchText = input.substring(pos + keyword.length).trim();
-            const words = validationSearchText.split(' ');
+        const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find'];
+        const lowerInput = input.toLowerCase();
+        let earliestPosition = -1;
+        
+        for (const verb of actionVerbs) {
+          const position = lowerInput.indexOf(verb);
+          if (position !== -1) {
+            if (earliestPosition === -1 || position < earliestPosition) {
+              earliestPosition = position;
+            }
+          }
+        }
+        
+        if (earliestPosition !== -1) {
+          let afterAction = input.substring(earliestPosition).trim();
+          const match = afterAction.match(/\b(create|modify|update|search|delete|add|remove|find)\b/i);
+          if (match) {
+            const verbLength = match[0].length;
+            const afterVerb = afterAction.substring(afterAction.toLowerCase().indexOf(match[0]) + verbLength).trim();
+            const words = afterVerb.split(' ');
             if (words.length > 0) {
               validationSearchText = words[0];
             }
-            break;
           }
         }
       }
