@@ -10,9 +10,9 @@ const PORT = process.env.PORT || 3000;
 
 // Constants from Pseudocode
 const SAFETY_FLOOR = 0.30;
-const MAX_DISTANCE_TO_GOLD = 0.5;
-const MAX_DISTANCE_TO_REF1 = 0.3;
-const MAX_DISTANCE_TO_REF2 = 0.2;
+const MAX_DISTANCE_TO_GOLD = 0.3;
+const MAX_DISTANCE_TO_REF1 = 0.2;
+const MAX_DISTANCE_TO_REF2 = 0.1;
 
 const logs = [];
 
@@ -198,7 +198,6 @@ function extractProcessText(userInput) {
   let earliestPosition = -1;
   let foundVerb = '';
   
-  // Find the earliest occurring verb
   for (const verb of actionVerbs) {
     const position = lowerInput.indexOf(verb);
     if (position !== -1) {
@@ -212,17 +211,14 @@ function extractProcessText(userInput) {
   if (earliestPosition >= 0) {
     let afterVerb = userInput.substring(earliestPosition + foundVerb.length).trim();
     
-    // List of known multi-word processes to match completely
     const multiWordProcesses = ['key result checkin', 'review meeting', 'key result'];
     
-    // Try to match multi-word processes first
     for (const process of multiWordProcesses) {
       if (afterVerb.toLowerCase().startsWith(process)) {
         return process;
       }
     }
     
-    // Otherwise, extract until filter keywords
     const filterKeywords = ['with', 'where', 'having', 'for'];
     for (const keyword of filterKeywords) {
       const keywordPos = afterVerb.toLowerCase().indexOf(keyword);
@@ -576,8 +572,24 @@ class ConversationAnalyzer {
 
     if (!actionFound) {
       const searchText = extractActionText(input);
-      if (searchText) {
-        const validation_result = await performCircleValidation(searchText, 'action');
+      let validationSearchText = searchText;
+      if (!validationSearchText) {
+        const intentKeywords = ['i want to', 'i need to', 'how do i', 'i am seeking to', 'i would like to', 'i am planning to', 'i am trying to'];
+        for (const keyword of intentKeywords) {
+          const pos = input.indexOf(keyword);
+          if (pos >= 0) {
+            validationSearchText = input.substring(pos + keyword.length).trim();
+            const words = validationSearchText.split(' ');
+            if (words.length > 0) {
+              validationSearchText = words[0];
+            }
+            break;
+          }
+        }
+      }
+      
+      if (validationSearchText) {
+        const validation_result = await performCircleValidation(validationSearchText, 'action');
         if (validation_result.matched) {
           this.analysis.action = { status: validation_result.clarity, value: validation_result.gold_standard, reply: `Detected action: ${validation_result.gold_standard}` };
           this.analysis.step3_reply = `Detected action: ${validation_result.gold_standard}`;
