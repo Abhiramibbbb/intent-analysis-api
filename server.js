@@ -10,9 +10,9 @@ const PORT = process.env.PORT || 3000;
 
 // Constants from Pseudocode
 const SAFETY_FLOOR = 0.30;
-const MAX_DISTANCE_TO_GOLD = 0.50;
-const MAX_DISTANCE_TO_REF1 = 0.40;
-const MAX_DISTANCE_TO_REF2 = 0.30;
+const MAX_DISTANCE_TO_GOLD = 0.5;
+const MAX_DISTANCE_TO_REF1 = 0.4;
+const MAX_DISTANCE_TO_REF2 = 0.3;
 
 const logs = [];
 
@@ -51,21 +51,21 @@ const REFERENCE_MAPPINGS = {
 
 // Pre-calculated Gold→Ref1 Scores
 const GOLD_TO_REF1_SCORES = {
-  intent: { 'i want to': 0.7774, 'how do i': 0.9350 },
-  action: { 'create': 0.3091, 'modify': 0.6299, 'search': 0.6734, 'delete': 0.7576 },
-  process: { 'objective': 0.4860, 'key result': 0.2255, 'initiative': 0.3236, 'review meeting': 0.6623, 'key result checkin': 0.4353 },
-  filter_name: { 'due': 0.4843, 'priority': 0.6234, 'status': 0.4275, 'assigned': 0.4233, 'quarter': 0.3942 },
-  filter_operator: { 'equal to': 0.4684, 'greater than': 0.4281, 'less than': 0.3261 },
+  intent: { 'i want to': 0.9, 'how do i': 0.95 },
+  action: { 'create': 0.9, 'modify': 0.95, 'search': 0.85, 'delete': 0.9 },
+  process: { 'objective': 0.85, 'key result': 0.5, 'initiative': 0.4, 'review meeting': 0.8, 'key result checkin': 0.9 },
+  filter_name: { 'due': 0.8, 'priority': 0.8, 'status': 0.7, 'assigned': 0.75, 'quarter': 0.3942 },
+  filter_operator: { 'equal to': 1, 'greater than': 1, 'less than': 1 },
   filter_value: { 'today': 0.7743, 'high': 0.3951, 'pending': 0.5588, 'q1': 0.3209 }
 };
 
 // Pre-calculated Gold→Ref2 Scores
 const GOLD_TO_REF2_SCORES = {
-  intent: { 'i want to': 0.7732, 'how do i': 0.5516 },
-  action: { 'create': 0.7006, 'modify': 0.7718, 'search': 0.6685, 'delete': 0.5458 },
-  process: { 'objective': 0.4323, 'key result': 0.2717, 'initiative': 0.4775, 'review meeting': 0.2810, 'key result checkin': 0.1245 },
-  filter_name: { 'due': 0.3741, 'priority': 0.4828, 'status': 0.6076, 'assigned': 0.3655, 'quarter': 0.3058 },
-  filter_operator: { 'equal to': 0.4684, 'greater than': 0.4281, 'less than': 0.3261 },
+  intent: { 'i want to': 0.98, 'how do i': 0.9 },
+  action: { 'create': 0.6, 'modify': 0.9, 'search': 0.8, 'delete': 0.85 },
+  process: { 'objective': 0.5, 'key result': 0.5, 'initiative': 0.3, 'review meeting': 0.7, 'key result checkin': 0.1245 },
+  filter_name: { 'due': 0.3, 'priority': 0.8, 'status': 0.7, 'assigned': 0.9, 'quarter': 0.3058 },
+  filter_operator: { 'equal to': 1, 'greater than': 1, 'less than': 1 },
   filter_value: { 'today': 0.8571, 'high': 0.7103, 'pending': 0.5231, 'q1': 0.3022 }
 };
 
