@@ -11,8 +11,8 @@ const PORT = process.env.PORT || 3000;
 // Constants from Pseudocode
 const SAFETY_FLOOR = 0.30;
 const MAX_DISTANCE_TO_GOLD = 0.50;
-const MAX_DISTANCE_TO_REF1 = 0.4;
-const MAX_DISTANCE_TO_REF2 = 0.3;
+const MAX_DISTANCE_TO_REF1 = 0.40;
+const MAX_DISTANCE_TO_REF2 = 0.30;
 
 const logs = [];
 
@@ -370,6 +370,56 @@ async function performCircleValidation(searchText, category) {
   }
 }
 
+// ============================================================================
+// VALIDATION LOGGING UTILITY
+// ============================================================================
+
+function logValidationSummary(validationLogs) {
+  if (!validationLogs || validationLogs.length === 0) {
+    console.log('\n[VALIDATION SUMMARY] No validation checks performed\n');
+    return;
+  }
+
+  console.log('\n' + '='.repeat(80));
+  console.log('VALIDATION SUMMARY');
+  console.log('='.repeat(80));
+  
+  const accepted = validationLogs.filter(log => log.acceptance_status === 'ACCEPTED');
+  const rejected = validationLogs.filter(log => log.acceptance_status === 'REJECTED');
+  
+  console.log(`\nTotal Checks: ${validationLogs.length}`);
+  console.log(`✅ Accepted: ${accepted.length}`);
+  console.log(`❌ Rejected: ${rejected.length}`);
+  
+  if (accepted.length > 0) {
+    console.log('\n--- ACCEPTED VALIDATIONS ---');
+    accepted.forEach((log, index) => {
+      console.log(`\n[${index + 1}] Component: ${log.component_type.toUpperCase()}`);
+      console.log(`    New Value: "${log.variable1_new_value}"`);
+      console.log(`    Distance to Gold: ${log.variable2_distance_to_gold?.toFixed(4) || 'N/A'}`);
+      console.log(`    Distance to Ref1: ${log.variable3_distance_to_ref1?.toFixed(4) || 'N/A'}`);
+      console.log(`    Distance to Ref2: ${log.variable4_distance_to_ref2?.toFixed(4) || 'N/A'}`);
+      console.log(`    Validation Path: ${log.validation_path}`);
+      console.log(`    Status: ✅ ${log.acceptance_status}`);
+    });
+  }
+  
+  if (rejected.length > 0) {
+    console.log('\n--- REJECTED VALIDATIONS ---');
+    rejected.forEach((log, index) => {
+      console.log(`\n[${index + 1}] Component: ${log.component_type.toUpperCase()}`);
+      console.log(`    New Value: "${log.variable1_new_value}"`);
+      console.log(`    Distance to Gold: ${log.variable2_distance_to_gold?.toFixed(4) || 'N/A'}`);
+      console.log(`    Distance to Ref1: ${log.variable3_distance_to_ref1?.toFixed(4) || 'N/A'}`);
+      console.log(`    Distance to Ref2: ${log.variable4_distance_to_ref2?.toFixed(4) || 'N/A'}`);
+      console.log(`    Validation Path: ${log.validation_path}`);
+      console.log(`    Status: ❌ ${log.acceptance_status}`);
+    });
+  }
+  
+  console.log('\n' + '='.repeat(80) + '\n');
+}
+
 class ConversationAnalyzer {
   constructor() {
     this.reset();
@@ -408,6 +458,7 @@ class ConversationAnalyzer {
           this.analysis.intent = { status: 'Clear', value: intent, reply: 'Your intent is clear.' };
           this.analysis.step1_reply = 'Your intent is clear.';
           intentFound = true;
+          console.log(`[STEP1] ✓ Found in dictionary: "${pattern}" → ${intent}`);
           break;
         }
       }
@@ -421,6 +472,7 @@ class ConversationAnalyzer {
             this.analysis.intent = { status: 'Adequate Clarity', value: intent, reply: 'Your intent seems somewhat clear.' };
             this.analysis.step1_reply = 'Your intent seems somewhat clear.';
             intentFound = true;
+            console.log(`[STEP1] ✓ Found in phrase dictionary: "${phrase}" → ${intent}`);
             break;
           }
         }
@@ -430,6 +482,7 @@ class ConversationAnalyzer {
 
     if (!intentFound) {
       const searchText = extractIntentText(input);
+      console.log(`[STEP1] Performing validation for: "${searchText}"`);
       const validation_result = await performCircleValidation(searchText, 'intent');
 
       if (validation_result.matched) {
@@ -474,6 +527,7 @@ class ConversationAnalyzer {
           this.analysis.process = { status: 'Clear', value: process, reply: `Detected process: ${process}` };
           this.analysis.step2_reply = `Detected process: ${process}`;
           processFound = true;
+          console.log(`[STEP2] ✓ Found in dictionary: "${keyword}" → ${process}`);
           break;
         }
       }
@@ -487,6 +541,7 @@ class ConversationAnalyzer {
             this.analysis.process = { status: 'Adequate Clarity', value: process, reply: `Detected process: ${process}` };
             this.analysis.step2_reply = `Detected process: ${process}`;
             processFound = true;
+            console.log(`[STEP2] ✓ Found in phrase dictionary: "${phrase}" → ${process}`);
             break;
           }
         }
@@ -532,6 +587,7 @@ class ConversationAnalyzer {
       }
       
       if (searchText) {
+        console.log(`[STEP2] Performing validation for: "${searchText}"`);
         const validation_result = await performCircleValidation(searchText, 'process');
         if (validation_result.matched) {
           this.analysis.process = { status: validation_result.clarity, value: validation_result.gold_standard, reply: `Detected process: ${validation_result.gold_standard}` };
@@ -585,6 +641,7 @@ class ConversationAnalyzer {
           this.analysis.action = { status: 'Clear', value: action, reply: `Detected action: ${action}` };
           this.analysis.step3_reply = `Detected action: ${action}`;
           actionFound = true;
+          console.log(`[STEP3] ✓ Found in dictionary: "${keyword}" → ${action}`);
           break;
         }
       }
@@ -598,6 +655,7 @@ class ConversationAnalyzer {
             this.analysis.action = { status: 'Adequate Clarity', value: action, reply: `Detected action: ${action}` };
             this.analysis.step3_reply = `Detected action: ${action}`;
             actionFound = true;
+            console.log(`[STEP3] ✓ Found in phrase dictionary: "${phrase}" → ${action}`);
             break;
           }
         }
@@ -635,6 +693,7 @@ class ConversationAnalyzer {
       }
       
       if (searchText) {
+        console.log(`[STEP3] Performing validation for: "${searchText}"`);
         const validation_result = await performCircleValidation(searchText, 'action');
         if (validation_result.matched) {
           this.analysis.action = { status: validation_result.clarity, value: validation_result.gold_standard, reply: `Detected action: ${validation_result.gold_standard}` };
@@ -665,6 +724,7 @@ class ConversationAnalyzer {
     if (intentCategory !== 'menu' || (actionValue !== 'modify' && actionValue !== 'search')) {
       this.analysis.filters = { status: 'Not Applicable', value: [], reply: 'Filters not applicable.' };
       this.analysis.step4_reply = 'Filters not applicable.';
+      console.log(`[STEP4] Filters not applicable for intent: ${intentCategory}, action: ${actionValue}`);
       return;
     }
 
@@ -687,11 +747,14 @@ class ConversationAnalyzer {
     if (detectedFilters.length === 0) {
       this.analysis.filters = { status: 'Not Found', value: [], reply: 'No filters detected.' };
       this.analysis.step4_reply = 'No filters detected.';
+      console.log(`[STEP4] No filters detected in input`);
       return;
     }
 
+    console.log(`[STEP4] Found ${detectedFilters.length} filter(s)`);
     for (let i = 0; i < detectedFilters.length; i++) {
       const filter = detectedFilters[i];
+      console.log(`[STEP4] Analyzing filter ${i + 1}: name="${filter.name}", operator="${filter.operator}", value="${filter.value}"`);
       await this.analyzeFilterComponent(filter, 'name', 'filter_name', FILTER_NAME_DICTIONARY, FILTER_NAME_PHRASE_DICTIONARY);
       await this.analyzeFilterComponent(filter, 'operator', 'filter_operator', FILTER_OPERATOR_DICTIONARY, FILTER_OPERATOR_PHRASE_DICTIONARY);
       await this.analyzeFilterComponent(filter, 'value', 'filter_value', FILTER_VALUE_DICTIONARY, FILTER_VALUE_PHRASE_DICTIONARY);
@@ -718,6 +781,7 @@ class ConversationAnalyzer {
       this.analysis.filters.reply = 'Filters are not clear.';
       this.analysis.step4_reply = 'Filters are not clear.';
     }
+    console.log(`[STEP4] Result: ${this.analysis.filters.status}`);
   }
 
   async analyzeFilterComponent(filter, componentKey, category, dictionary, phraseDictionary) {
@@ -731,6 +795,7 @@ class ConversationAnalyzer {
           filter[statusKey] = 'Clear';
           filter[componentKey] = standardValue;
           found = true;
+          console.log(`[STEP4] ✓ Filter ${componentKey} found in dictionary: "${keyword}" → ${standardValue}`);
           break;
         }
       }
@@ -744,6 +809,7 @@ class ConversationAnalyzer {
             filter[statusKey] = 'Adequate Clarity';
             filter[componentKey] = standardValue;
             found = true;
+            console.log(`[STEP4] ✓ Filter ${componentKey} found in phrase dictionary: "${phrase}" → ${standardValue}`);
             break;
           }
         }
@@ -752,6 +818,7 @@ class ConversationAnalyzer {
     }
 
     if (!found) {
+      console.log(`[STEP4] Performing validation for filter ${componentKey}: "${componentValue}"`);
       const validation_result = await performCircleValidation(componentValue, category);
       if (validation_result.matched) {
         filter[statusKey] = validation_result.clarity;
@@ -773,6 +840,7 @@ class ConversationAnalyzer {
 
     if (!found) {
       filter[statusKey] = 'Not Clear';
+      console.log(`[STEP4] ✗ Filter ${componentKey} not clear: "${componentValue}"`);
     }
   }
 
@@ -800,6 +868,7 @@ class ConversationAnalyzer {
       }
       this.analysis.finalAnalysis = `Your intent is clear to ${actionValue} on ${processValue}${filterText}.`;
       this.analysis.proceed_button = true;
+      console.log(`[STEP5] ✅ Analysis successful`);
     } else {
       let failures = [];
       if (intentStatus !== 'Clear' && intentStatus !== 'Adequate Clarity') failures.push('intent');
@@ -808,6 +877,7 @@ class ConversationAnalyzer {
       if (filterStatus === 'Not Clear') failures.push('filters');
       this.analysis.finalAnalysis = `Unable to determine: ${failures.join(', ')}.`;
       this.analysis.proceed_button = false;
+      console.log(`[STEP5] ❌ Analysis incomplete - failures: ${failures.join(', ')}`);
 
       if (intentValue === 'menu') {
         this.analysis.suggested_action = 'Please rephrase using: create, modify, search, or delete.';
@@ -826,14 +896,26 @@ class ConversationAnalyzer {
     console.log(`\n${'='.repeat(80)}`);
     console.log(`NEW ANALYSIS REQUEST: "${userInput}"`);
     console.log(`${'='.repeat(80)}`);
+    
     this.reset();
     this.analysis.userInput = userInput;
+    
     await this.step1_intentConclusion(userInput);
     await this.step2_processConclusion(userInput);
-    if (this.checkHelpRedirect()) return this.analysis;
+    
+    if (this.checkHelpRedirect()) {
+      logValidationSummary(this.analysis.validation_logs);
+      console.log(`${'='.repeat(80)}\n`);
+      return this.analysis;
+    }
+    
     await this.step3_actionConclusion(userInput);
     await this.step4_filterAnalysis(userInput);
     this.step5_finalAnalysis();
+    
+    // Log validation summary before returning
+    logValidationSummary(this.analysis.validation_logs);
+    
     console.log(`${'='.repeat(80)}\n`);
     return this.analysis;
   }
@@ -875,12 +957,33 @@ app.post('/analyze', async (req, res) => {
     if (!qdrantService.initialized) {
       return res.status(503).json({ success: false, error: 'Service initializing. Please try again.' });
     }
+    
     const analyzer = new ConversationAnalyzer();
     const analysis = await analyzer.analyze(sentence);
-    const logEntry = { timestamp: new Date().toISOString(), sentence, analysis, validation_logs: analysis.validation_logs };
+    
+    const logEntry = { 
+      timestamp: new Date().toISOString(), 
+      sentence, 
+      analysis,
+      validation_logs: analysis.validation_logs 
+    };
+    
     logs.push(logEntry);
     if (logs.length > 100) logs.shift();
-    res.json({ success: true, analysis });
+    
+    // Enhanced response with validation summary
+    const validationSummary = {
+      total_checks: analysis.validation_logs.length,
+      accepted: analysis.validation_logs.filter(log => log.acceptance_status === 'ACCEPTED').length,
+      rejected: analysis.validation_logs.filter(log => log.acceptance_status === 'REJECTED').length,
+      details: analysis.validation_logs
+    };
+    
+    res.json({ 
+      success: true, 
+      analysis,
+      validation_summary: validationSummary
+    });
   } catch (error) {
     console.error('❌ Error:', error.message);
     res.status(500).json({ success: false, error: 'Analysis failed', message: error.message });
@@ -896,12 +999,33 @@ app.post('/api/analyze', async (req, res) => {
     if (!qdrantService.initialized) {
       return res.status(503).json({ success: false, error: 'Service initializing. Please try again.' });
     }
+    
     const analyzer = new ConversationAnalyzer();
     const analysis = await analyzer.analyze(sentence);
-    const logEntry = { timestamp: new Date().toISOString(), sentence, analysis, validation_logs: analysis.validation_logs };
+    
+    const logEntry = { 
+      timestamp: new Date().toISOString(), 
+      sentence, 
+      analysis,
+      validation_logs: analysis.validation_logs 
+    };
+    
     logs.push(logEntry);
     if (logs.length > 100) logs.shift();
-    res.json({ success: true, analysis });
+    
+    // Enhanced response with validation summary
+    const validationSummary = {
+      total_checks: analysis.validation_logs.length,
+      accepted: analysis.validation_logs.filter(log => log.acceptance_status === 'ACCEPTED').length,
+      rejected: analysis.validation_logs.filter(log => log.acceptance_status === 'REJECTED').length,
+      details: analysis.validation_logs
+    };
+    
+    res.json({ 
+      success: true, 
+      analysis,
+      validation_summary: validationSummary
+    });
   } catch (error) {
     console.error('❌ Error:', error.message);
     res.status(500).json({ success: false, error: 'Analysis failed', message: error.message });
