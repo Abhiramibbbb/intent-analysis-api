@@ -501,35 +501,33 @@ class ConversationAnalyzer {
         const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find'];
         const lowerInput = input.toLowerCase();
         let earliestPosition = -1;
+        let foundVerb = '';
         
         for (const verb of actionVerbs) {
           const position = lowerInput.indexOf(verb);
           if (position !== -1) {
             if (earliestPosition === -1 || position < earliestPosition) {
               earliestPosition = position;
+              foundVerb = verb;
             }
           }
         }
         
         if (earliestPosition !== -1) {
-          let afterAction = input.substring(earliestPosition).trim();
-          const match = afterAction.match(/\b(create|modify|update|search|delete|add|remove|find)\b/i);
-          if (match) {
-            const verbLength = match[0].length;
-            const afterVerb = afterAction.substring(afterAction.toLowerCase().indexOf(match[0]) + verbLength).trim();
-            const filterKeywords = ['with', 'where', 'having', 'for'];
-            let finalText = afterVerb;
-            
-            for (const keyword of filterKeywords) {
-              const keywordPos = finalText.toLowerCase().indexOf(keyword);
-              if (keywordPos >= 0) {
-                finalText = finalText.substring(0, keywordPos).trim();
-                break;
-              }
+          const afterVerbPosition = earliestPosition + foundVerb.length;
+          const afterVerb = input.substring(afterVerbPosition).trim();
+          const filterKeywords = ['with', 'where', 'having', 'for'];
+          let finalText = afterVerb;
+          
+          for (const keyword of filterKeywords) {
+            const keywordPos = finalText.toLowerCase().indexOf(keyword);
+            if (keywordPos >= 0) {
+              finalText = finalText.substring(0, keywordPos).trim();
+              break;
             }
-            
-            searchText = finalText || afterVerb;
           }
+          
+          searchText = finalText || afterVerb;
         }
       }
       
@@ -608,38 +606,36 @@ class ConversationAnalyzer {
     }
 
     if (!actionFound) {
-      const searchText = extractActionText(input);
-      let validationSearchText = searchText;
-      if (!validationSearchText) {
+      let searchText = extractActionText(input);
+      
+      if (!searchText) {
         const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find'];
         const lowerInput = input.toLowerCase();
         let earliestPosition = -1;
+        let foundVerb = '';
         
         for (const verb of actionVerbs) {
           const position = lowerInput.indexOf(verb);
           if (position !== -1) {
             if (earliestPosition === -1 || position < earliestPosition) {
               earliestPosition = position;
+              foundVerb = verb;
             }
           }
         }
         
         if (earliestPosition !== -1) {
-          let afterAction = input.substring(earliestPosition).trim();
-          const match = afterAction.match(/\b(create|modify|update|search|delete|add|remove|find)\b/i);
-          if (match) {
-            const verbLength = match[0].length;
-            const afterVerb = afterAction.substring(afterAction.toLowerCase().indexOf(match[0]) + verbLength).trim();
-            const words = afterVerb.split(' ');
-            if (words.length > 0) {
-              validationSearchText = words[0];
-            }
+          const afterVerbPosition = earliestPosition + foundVerb.length;
+          const afterVerb = input.substring(afterVerbPosition).trim();
+          const words = afterVerb.split(/\s+/);
+          if (words.length > 0 && words[0]) {
+            searchText = words[0];
           }
         }
       }
       
-      if (validationSearchText) {
-        const validation_result = await performCircleValidation(validationSearchText, 'action');
+      if (searchText) {
+        const validation_result = await performCircleValidation(searchText, 'action');
         if (validation_result.matched) {
           this.analysis.action = { status: validation_result.clarity, value: validation_result.gold_standard, reply: `Detected action: ${validation_result.gold_standard}` };
           this.analysis.step3_reply = `Detected action: ${validation_result.gold_standard}`;
