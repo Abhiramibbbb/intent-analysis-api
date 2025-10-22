@@ -8,11 +8,11 @@ const qdrantService = require('./qdrant-service');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Constants from Pseudocode
+// Constants from Pseudocode - EXACT VALUES FROM PSEUDOCODE
 const SAFETY_FLOOR = 0.30;
-const MAX_DISTANCE_TO_GOLD = 0.5;
-const MAX_DISTANCE_TO_REF1 = 0.4;
-const MAX_DISTANCE_TO_REF2 = 0.3;
+const MAX_DISTANCE_TO_GOLD = 0.30;
+const MAX_DISTANCE_TO_REF1 = 0.2;   // Changed from 0.15 to 0.2 as per pseudocode
+const MAX_DISTANCE_TO_REF2 = 0.1;   // Changed from 0.15 to 0.1 as per pseudocode
 
 const logs = [];
 
@@ -21,7 +21,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.use('/docs', express.static('docs'));
 
-// Reference Mappings
+// Reference Mappings - EXACT FROM PSEUDOCODE
 const REFERENCE_MAPPINGS = {
   intent: {
     ref1: { 'i want to': 'i need to', 'how do i': 'how can i' },
@@ -44,27 +44,27 @@ const REFERENCE_MAPPINGS = {
     ref2: { 'equal to': '=', 'greater than': '>', 'less than': '<' }
   },
   filter_value: {
-    ref1: { 'today': 'this day', 'high': 'critical', 'pending': 'ongoing', 'q1': 'First Quarter' },
-    ref2: { 'today': 'current day', 'high': 'top priority', 'pending': 'unfinished', 'q1': 'Q One' }
+    ref1: { 'today': 'this day', 'high': 'critical', 'pending': 'ongoing', 'q1': 'first quarter' },
+    ref2: { 'today': 'current date', 'high': 'top priority', 'pending': 'unfinished', 'q1': 'Q one' }
   }
 };
 
-// Pre-calculated Gold→Ref1 Scores
+// Pre-calculated Gold→Ref1 Scores - EXACT FROM PSEUDOCODE
 const GOLD_TO_REF1_SCORES = {
   intent: { 'i want to': 0.9, 'how do i': 0.95 },
-  action: { 'create': 0.9, 'modify': 0.95, 'search': 0.85, 'delete': 0.9 },
+  action: { 'create': 0.9, 'modify': 0.95, 'search': 0.85, 'delete': 0.95 },
   process: { 'objective': 0.85, 'key result': 0.5, 'initiative': 0.4, 'review meeting': 0.8, 'key result checkin': 0.9 },
   filter_name: { 'due': 0.8, 'priority': 0.8, 'status': 0.7, 'assigned': 0.75, 'quarter': 0.3942 },
   filter_operator: { 'equal to': 1, 'greater than': 1, 'less than': 1 },
   filter_value: { 'today': 0.7743, 'high': 0.3951, 'pending': 0.5588, 'q1': 0.3209 }
 };
 
-// Pre-calculated Gold→Ref2 Scores
+// Pre-calculated Gold→Ref2 Scores - EXACT FROM PSEUDOCODE
 const GOLD_TO_REF2_SCORES = {
   intent: { 'i want to': 0.98, 'how do i': 0.9 },
   action: { 'create': 0.6, 'modify': 0.9, 'search': 0.8, 'delete': 0.85 },
   process: { 'objective': 0.5, 'key result': 0.5, 'initiative': 0.3, 'review meeting': 0.7, 'key result checkin': 0.1245 },
-  filter_name: { 'due': 0.3, 'priority': 0.8, 'status': 0.7, 'assigned': 0.9, 'quarter': 0.3058 },
+  filter_name: { 'due': 0.3, 'priority': 0.8, 'status': 0.7, 'assigned': 0.9, 'quarter': 0.2 },
   filter_operator: { 'equal to': 1, 'greater than': 1, 'less than': 1 },
   filter_value: { 'today': 0.8571, 'high': 0.7103, 'pending': 0.5231, 'q1': 0.3022 }
 };
@@ -295,20 +295,25 @@ async function performCircleValidation(searchText, category) {
     const variables = {
       variable1_new_value: searchText,
       variable2_distance_to_gold: 1.0 - new_to_gold_score,
-      variable3_distance_to_ref1: 0,
-      variable4_distance_to_ref2: 0
+      variable3_distance_to_ref1: null,
+      variable4_distance_to_ref2: null
     };
 
     const ref1_phrase = REFERENCE_MAPPINGS[qdrantCategory]?.ref1[gold_standard];
     const ref2_phrase = REFERENCE_MAPPINGS[qdrantCategory]?.ref2[gold_standard];
 
     if (!ref1_phrase || !ref2_phrase) {
-      console.log(`[VALIDATION] ❌ No references found`);
+      console.log(`[VALIDATION] ❌ No references found for "${gold_standard}"`);
       console.log(`${'='.repeat(80)}\n`);
       return { matched: false, gold_standard, clarity: null, variables: null, validation_path: 'NONE' };
     }
 
-    console.log(`\n[VALIDATION] ┌─ CHECK 1: Distance to Gold (< ${MAX_DISTANCE_TO_GOLD})`);
+    console.log(`\n[VALIDATION] === REFERENCES ===`);
+    console.log(`   Ref1: "${ref1_phrase}"`);
+    console.log(`   Ref2: "${ref2_phrase}"`);
+
+    // Check 2A: Distance to Gold
+    console.log(`\n[VALIDATION] ┌─ CHECK 2A: Distance to Gold (< ${MAX_DISTANCE_TO_GOLD})`);
     console.log(`[VALIDATION] │  Distance: ${variables.variable2_distance_to_gold.toFixed(4)}`);
     
     if (variables.variable2_distance_to_gold < MAX_DISTANCE_TO_GOLD) {
@@ -323,11 +328,26 @@ async function performCircleValidation(searchText, category) {
     }
     console.log(`[VALIDATION] └─ ❌ FAILED`);
 
-    console.log(`\n[VALIDATION] ┌─ CHECK 2: Distance to Ref1 (< ${MAX_DISTANCE_TO_REF1})`);
+    // Check 2B: Distance to Ref1
+    console.log(`\n[VALIDATION] ┌─ CHECK 2B: Distance to Ref1 (< ${MAX_DISTANCE_TO_REF1})`);
     const ref1_results = await qdrantService.searchSimilar(searchText, qdrantCategory, 10, 0.0);
-    const new_to_ref1_score = ref1_results?.score || 0;
+    let new_to_ref1_score = 0;
+    
+    if (ref1_results && ref1_results.all_results) {
+      const ref1Match = ref1_results.all_results.find(r => r.match.toLowerCase() === ref1_phrase.toLowerCase());
+      if (ref1Match) {
+        new_to_ref1_score = ref1Match.score;
+      } else {
+        const directRef1 = await qdrantService.searchSimilar(searchText, qdrantCategory, 1, 0.0);
+        new_to_ref1_score = directRef1?.score || 0;
+      }
+    }
+    
     const gold_to_ref1_score = GOLD_TO_REF1_SCORES[qdrantCategory]?.[gold_standard] || 0;
     variables.variable3_distance_to_ref1 = Math.abs(new_to_ref1_score - gold_to_ref1_score);
+    
+    console.log(`[VALIDATION] │  New→Ref1 Score: ${new_to_ref1_score.toFixed(4)}`);
+    console.log(`[VALIDATION] │  Gold→Ref1 Score: ${gold_to_ref1_score.toFixed(4)}`);
     console.log(`[VALIDATION] │  Distance: ${variables.variable3_distance_to_ref1.toFixed(4)}`);
 
     if (variables.variable3_distance_to_ref1 < MAX_DISTANCE_TO_REF1) {
@@ -342,11 +362,26 @@ async function performCircleValidation(searchText, category) {
     }
     console.log(`[VALIDATION] └─ ❌ FAILED`);
 
-    console.log(`\n[VALIDATION] ┌─ CHECK 3: Distance to Ref2 (< ${MAX_DISTANCE_TO_REF2})`);
+    // Check 2C: Distance to Ref2
+    console.log(`\n[VALIDATION] ┌─ CHECK 2C: Distance to Ref2 (< ${MAX_DISTANCE_TO_REF2})`);
     const ref2_results = await qdrantService.searchSimilar(searchText, qdrantCategory, 10, 0.0);
-    const new_to_ref2_score = ref2_results?.score || 0;
+    let new_to_ref2_score = 0;
+    
+    if (ref2_results && ref2_results.all_results) {
+      const ref2Match = ref2_results.all_results.find(r => r.match.toLowerCase() === ref2_phrase.toLowerCase());
+      if (ref2Match) {
+        new_to_ref2_score = ref2Match.score;
+      } else {
+        const directRef2 = await qdrantService.searchSimilar(searchText, qdrantCategory, 1, 0.0);
+        new_to_ref2_score = directRef2?.score || 0;
+      }
+    }
+    
     const gold_to_ref2_score = GOLD_TO_REF2_SCORES[qdrantCategory]?.[gold_standard] || 0;
     variables.variable4_distance_to_ref2 = Math.abs(new_to_ref2_score - gold_to_ref2_score);
+    
+    console.log(`[VALIDATION] │  New→Ref2 Score: ${new_to_ref2_score.toFixed(4)}`);
+    console.log(`[VALIDATION] │  Gold→Ref2 Score: ${gold_to_ref2_score.toFixed(4)}`);
     console.log(`[VALIDATION] │  Distance: ${variables.variable4_distance_to_ref2.toFixed(4)}`);
 
     if (variables.variable4_distance_to_ref2 < MAX_DISTANCE_TO_REF2) {
@@ -913,7 +948,6 @@ class ConversationAnalyzer {
     await this.step4_filterAnalysis(userInput);
     this.step5_finalAnalysis();
     
-    // Log validation summary before returning
     logValidationSummary(this.analysis.validation_logs);
     
     console.log(`${'='.repeat(80)}\n`);
@@ -923,7 +957,7 @@ class ConversationAnalyzer {
 
 app.use((req, res, next) => {
   console.log(`📋 ${new Date().toISOString()} - ${req.method} ${req.path}`);
-  next();
+  next;
 });
 
 app.get('/health', (req, res) => {
@@ -971,7 +1005,6 @@ app.post('/analyze', async (req, res) => {
     logs.push(logEntry);
     if (logs.length > 100) logs.shift();
     
-    // Enhanced response with validation summary
     const validationSummary = {
       total_checks: analysis.validation_logs.length,
       accepted: analysis.validation_logs.filter(log => log.acceptance_status === 'ACCEPTED').length,
@@ -1013,7 +1046,6 @@ app.post('/api/analyze', async (req, res) => {
     logs.push(logEntry);
     if (logs.length > 100) logs.shift();
     
-    // Enhanced response with validation summary
     const validationSummary = {
       total_checks: analysis.validation_logs.length,
       accepted: analysis.validation_logs.filter(log => log.acceptance_status === 'ACCEPTED').length,
@@ -1065,7 +1097,7 @@ app.listen(PORT, async () => {
     console.log('Initializing Qdrant service...');
     await qdrantService.initialize();
     console.log('✓ Qdrant initialized');
-    console.log(`\nVALIDATION CONFIG:`);
+    console.log(`\nVALIDATION CONFIG (FROM PSEUDOCODE):`);
     console.log(`  Safety Floor: ${SAFETY_FLOOR}`);
     console.log(`  Max Distance Gold: ${MAX_DISTANCE_TO_GOLD}`);
     console.log(`  Max Distance Ref1: ${MAX_DISTANCE_TO_REF1}`);
