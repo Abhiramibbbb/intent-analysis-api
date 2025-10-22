@@ -52,7 +52,7 @@ const REFERENCE_MAPPINGS = {
 // Pre-calculated Gold→Ref1 Scores - EXACT FROM PSEUDOCODE
 const GOLD_TO_REF1_SCORES = {
   intent: { 'i want to': 0.9, 'how do i': 0.95 },
-  action: { 'create': 0.9, 'modify': 0.95, 'search': 0.85, 'delete': 0.95 },
+  action: { 'create': 0.9, 'modify': '0.95', 'search': 0.85, 'delete': 0.95 },
   process: { 'objective': 0.85, 'key result': 0.5, 'initiative': 0.4, 'review meeting': 0.8, 'key result checkin': 0.9 },
   filter_name: { 'due': 0.8, 'priority': 0.8, 'status': 0.7, 'assigned': 0.75, 'quarter': 0.3942 },
   filter_operator: { 'equal to': 1, 'greater than': 1, 'less than': 1 },
@@ -233,7 +233,7 @@ function extractProcessText(userInput) {
 }
 
 function extractActionText(userInput) {
-  const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find', 'generate', 'change', 'locate', 'erase'];
+  const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find', 'generate', 'change', 'locate', 'erase', 'construct', 'draft'];
   const lowerInput = userInput.toLowerCase();
   let earliestPosition = -1;
   let foundVerb = '';
@@ -271,13 +271,13 @@ async function performCircleValidation(searchText, category) {
       return { matched: false, gold_standard: null, clarity: null, variables: null, validation_path: 'NONE' };
     }
 
-    let categoryResult = results.match;
+    let categoryResult = results.match.toLowerCase();
     const new_to_gold_score = results.score;
     let gold_standard = categoryResult;
     
     if (CATEGORY_TO_GOLD_PHRASE[qdrantCategory]?.[categoryResult]) {
       gold_standard = CATEGORY_TO_GOLD_PHRASE[qdrantCategory][categoryResult];
-      console.log(`[VALIDATION] ✓ Mapped "${categoryResult}" → "${gold_standard}"`);
+      console.log(`[VALIDATION] ✓ Mapped "${results.match}" → "${gold_standard}"`);
     }
     
     console.log(`\n[VALIDATION] === BEST MATCH ===`);
@@ -299,8 +299,8 @@ async function performCircleValidation(searchText, category) {
       variable4_distance_to_ref2: null
     };
 
-    const ref1_phrase = REFERENCE_MAPPINGS[qdrantCategory]?.ref1[gold_standard];
-    const ref2_phrase = REFERENCE_MAPPINGS[qdrantCategory]?.ref2[gold_standard];
+    const ref1_phrase = REFERENCE_MAPPINGS[qdrantCategory]?.ref1[gold_standard.toLowerCase()];
+    const ref2_phrase = REFERENCE_MAPPINGS[qdrantCategory]?.ref2[gold_standard.toLowerCase()];
 
     if (!ref1_phrase || !ref2_phrase) {
       console.log(`[VALIDATION] ❌ No references found for "${gold_standard}"`);
@@ -312,7 +312,6 @@ async function performCircleValidation(searchText, category) {
     console.log(`   Ref1: "${ref1_phrase}"`);
     console.log(`   Ref2: "${ref2_phrase}"`);
 
-    // Check 2A: Distance to Gold
     console.log(`\n[VALIDATION] ┌─ CHECK 2A: Distance to Gold (< ${MAX_DISTANCE_TO_GOLD})`);
     console.log(`[VALIDATION] │  Distance: ${variables.variable2_distance_to_gold.toFixed(4)}`);
     
@@ -328,7 +327,6 @@ async function performCircleValidation(searchText, category) {
     }
     console.log(`[VALIDATION] └─ ❌ FAILED`);
 
-    // Check 2B: Distance to Ref1
     console.log(`\n[VALIDATION] ┌─ CHECK 2B: Distance to Ref1 (< ${MAX_DISTANCE_TO_REF1})`);
     const ref1_results = await qdrantService.searchSimilar(searchText, qdrantCategory, 10, 0.0);
     let new_to_ref1_score = 0;
@@ -343,7 +341,7 @@ async function performCircleValidation(searchText, category) {
       }
     }
     
-    const gold_to_ref1_score = GOLD_TO_REF1_SCORES[qdrantCategory]?.[gold_standard] || 0;
+    const gold_to_ref1_score = GOLD_TO_REF1_SCORES[qdrantCategory]?.[gold_standard.toLowerCase()] || 0;
     variables.variable3_distance_to_ref1 = Math.abs(new_to_ref1_score - gold_to_ref1_score);
     
     console.log(`[VALIDATION] │  New→Ref1 Score: ${new_to_ref1_score.toFixed(4)}`);
@@ -362,7 +360,6 @@ async function performCircleValidation(searchText, category) {
     }
     console.log(`[VALIDATION] └─ ❌ FAILED`);
 
-    // Check 2C: Distance to Ref2
     console.log(`\n[VALIDATION] ┌─ CHECK 2C: Distance to Ref2 (< ${MAX_DISTANCE_TO_REF2})`);
     const ref2_results = await qdrantService.searchSimilar(searchText, qdrantCategory, 10, 0.0);
     let new_to_ref2_score = 0;
@@ -377,7 +374,7 @@ async function performCircleValidation(searchText, category) {
       }
     }
     
-    const gold_to_ref2_score = GOLD_TO_REF2_SCORES[qdrantCategory]?.[gold_standard] || 0;
+    const gold_to_ref2_score = GOLD_TO_REF2_SCORES[qdrantCategory]?.[gold_standard.toLowerCase()] || 0;
     variables.variable4_distance_to_ref2 = Math.abs(new_to_ref2_score - gold_to_ref2_score);
     
     console.log(`[VALIDATION] │  New→Ref2 Score: ${new_to_ref2_score.toFixed(4)}`);
@@ -521,21 +518,15 @@ class ConversationAnalyzer {
       const validation_result = await performCircleValidation(searchText, 'intent');
 
       if (validation_result.matched) {
-        const detectedIntent = INTENT_PHRASE_TO_CATEGORY[validation_result.gold_standard] || 'menu';
-        this.analysis.intent = { status: validation_result.clarity, value: detectedIntent, reply: 'Your intent seems somewhat clear.' };
-        this.analysis.step1_reply = 'Your intent seems somewhat clear.';
+        const detectedIntent = INTENT_PHRASE_TO_CATEGORY[validation_result.gold_standard] || validation_result.gold_standard;
+        this.analysis.intent = { status: validation_result.clarity, value: detectedIntent, reply: `Detected intent: ${detectedIntent}` };
+        this.analysis.step1_reply = `Detected intent: ${detectedIntent}`;
         intentFound = true;
         if (validation_result.variables) {
-          this.analysis.validation_logs.push({
-            component_type: 'intent', ...validation_result.variables,
-            validation_path: validation_result.validation_path, acceptance_status: 'ACCEPTED'
-          });
+          this.analysis.validation_logs.push({ component_type: 'intent', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'ACCEPTED' });
         }
       } else if (validation_result.variables) {
-        this.analysis.validation_logs.push({
-          component_type: 'intent', ...validation_result.variables,
-          validation_path: validation_result.validation_path, acceptance_status: 'REJECTED'
-        });
+        this.analysis.validation_logs.push({ component_type: 'intent', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'REJECTED' });
       }
     }
 
@@ -702,7 +693,7 @@ class ConversationAnalyzer {
       let searchText = extractActionText(input);
       
       if (!searchText) {
-        const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find'];
+        const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find', 'construct', 'draft'];
         const lowerInput = input.toLowerCase();
         let earliestPosition = -1;
         let foundVerb = '';
@@ -717,7 +708,12 @@ class ConversationAnalyzer {
           }
         }
         
-        if (earliestPosition !== -1) {
+        if (earliestPosition === -1) {  // No known verb found, extract likely action word
+          const intentPhrases = INTENT_DICTIONARY[this.analysis.intent.value]?.primary || [];
+          let inputWords = input.split(/\s+/);
+          let actionIndex = inputWords.findIndex(word => intentPhrases.some(phrase => phrase.split(/\s+/).includes(word))) + 1;  // After intent
+          searchText = inputWords[actionIndex] || '';
+        } else {
           const afterVerbPosition = earliestPosition + foundVerb.length;
           const afterVerb = input.substring(afterVerbPosition).trim();
           const words = afterVerb.split(/\s+/);
