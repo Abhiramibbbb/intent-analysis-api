@@ -10,9 +10,9 @@ const PORT = process.env.PORT || 3000;
 
 // Constants from Pseudocode - EXACT VALUES FROM PSEUDOCODE
 const SAFETY_FLOOR = 0.30;
-const MAX_DISTANCE_TO_GOLD = 0.30;
-const MAX_DISTANCE_TO_REF1 = 0.2;   // Changed from 0.15 to 0.2 as per pseudocode
-const MAX_DISTANCE_TO_REF2 = 0.1;   // Changed from 0.15 to 0.1 as per pseudocode
+const MAX_DISTANCE_TO_GOLD = 0.5;
+const MAX_DISTANCE_TO_REF1 = 0.4;   // Changed from 0.15 to 0.2 as per pseudocode
+const MAX_DISTANCE_TO_REF2 = 0.3;   // Changed from 0.15 to 0.1 as per pseudocode
 
 const logs = [];
 
