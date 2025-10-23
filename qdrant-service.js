@@ -1,6 +1,5 @@
 const { QdrantClient } = require('@qdrant/js-client-rest');
 const { pipeline } = require('@huggingface/transformers');
-const { v4: uuidv4 } = require('uuid');
 
 class QdrantService {
   constructor() {
@@ -163,7 +162,7 @@ class QdrantService {
     this.nextId = id; // Update next available ID
   }
 
-  // NEW: Add a single phrase to Qdrant
+  // Add a single phrase to Qdrant
   async addPhrase(phrase, category, standardForm) {
     if (!this.initialized) {
       console.error('⚠️ Qdrant service not initialized');
@@ -199,7 +198,7 @@ class QdrantService {
     }
   }
 
-  // NEW: Check if a phrase exists in Qdrant
+  // Check if a phrase exists in Qdrant
   async phraseExists(phrase, category) {
     if (!this.initialized) {
       return false;
@@ -226,7 +225,7 @@ class QdrantService {
     }
   }
 
-  // UPDATED: Improved searchSimilar with better response format
+  // Improved searchSimilar with better response format
   async searchSimilar(text, category, limit = 10, scoreThreshold = 0.0) {
     if (!this.initialized) {
       console.error('⚠️ Qdrant service not initialized');
@@ -295,7 +294,7 @@ class QdrantService {
     return { match: null, score: 0, all_results: [] };
   }
 
-  // NEW: Get all points from a category (for debugging)
+  // Get all points from a category (for debugging)
   async getAllPoints(category, limit = 100) {
     if (!this.initialized) {
       console.error('⚠️ Qdrant service not initialized');
