@@ -1,16 +1,18 @@
 const { QdrantClient } = require('@qdrant/js-client-rest');
 const { pipeline } = require('@huggingface/transformers');
+const { v4: uuidv4 } = require('uuid');
 
 class QdrantService {
   constructor() {
     this.client = new QdrantClient({
       url: process.env.QDRANT_URL || 'http://localhost:6333',
       apiKey: process.env.QDRANT_API_KEY || undefined,
-      timeout: 30000 // ADD: 30 second timeout
+      timeout: 30000 // 30 second timeout
     });
     this.embedder = null;
     this.initialized = false;
     this.collectionName = 'intent_analysis';
+    this.nextId = 10000; // Start IDs from 10000 for dynamically added phrases
   }
 
   async initialize() {
@@ -158,13 +160,77 @@ class QdrantService {
     }
 
     console.log(`Successfully indexed ${points.length} entries`);
+    this.nextId = id; // Update next available ID
   }
 
-  // IMPROVED: Add retry logic and better error handling
+  // NEW: Add a single phrase to Qdrant
+  async addPhrase(phrase, category, standardForm) {
+    if (!this.initialized) {
+      console.error('⚠️ Qdrant service not initialized');
+      return false;
+    }
+
+    try {
+      console.log(`[QDRANT] Adding phrase "${phrase}" to category "${category}" with standard form "${standardForm}"`);
+      
+      const embedding = await this.getEmbedding(phrase);
+      
+      await this.client.upsert(this.collectionName, {
+        wait: true,
+        points: [{
+          id: this.nextId++,
+          vector: embedding,
+          payload: {
+            category: category,
+            value: standardForm,
+            text: phrase,
+            isPrimary: false,
+            dynamicallyAdded: true,
+            addedAt: new Date().toISOString()
+          }
+        }]
+      });
+      
+      console.log(`[QDRANT] ✓ Successfully added phrase "${phrase}" with ID ${this.nextId - 1}`);
+      return true;
+    } catch (error) {
+      console.error(`[QDRANT] ❌ Error adding phrase "${phrase}":`, error.message);
+      return false;
+    }
+  }
+
+  // NEW: Check if a phrase exists in Qdrant
+  async phraseExists(phrase, category) {
+    if (!this.initialized) {
+      return false;
+    }
+
+    try {
+      const embedding = await this.getEmbedding(phrase);
+      const searchResult = await this.client.search(this.collectionName, {
+        vector: embedding,
+        limit: 10,
+        filter: { must: [{ key: 'category', match: { value: category } }] },
+        with_payload: true,
+        score_threshold: 0.99 // Very high threshold for exact match
+      });
+
+      // Check if any result matches the phrase exactly
+      return searchResult.some(r => 
+        r.payload.text.toLowerCase() === phrase.toLowerCase() ||
+        r.payload.value.toLowerCase() === phrase.toLowerCase()
+      );
+    } catch (error) {
+      console.error(`Error checking if phrase exists:`, error.message);
+      return false;
+    }
+  }
+
+  // UPDATED: Improved searchSimilar with better response format
   async searchSimilar(text, category, limit = 10, scoreThreshold = 0.0) {
     if (!this.initialized) {
       console.error('⚠️ Qdrant service not initialized');
-      return { match: null, score: 0, matches: [] };
+      return { match: null, score: 0, all_results: [] };
     }
 
     const maxRetries = 2;
@@ -181,20 +247,25 @@ class QdrantService {
         });
 
         if (searchResult.length === 0) {
-          return { match: null, score: 0, matches: [] };
+          return { match: null, score: 0, all_results: [] };
         }
 
         const bestMatch = searchResult[0];
+        
+        // Format all results
+        const allResults = searchResult.map(r => ({
+          match: r.payload.value,
+          score: r.score,
+          text: r.payload.text,
+          isPrimary: r.payload.isPrimary
+        }));
+
         return {
           match: bestMatch.payload.value,
           score: bestMatch.score,
           text: bestMatch.payload.text,
           isPrimary: bestMatch.payload.isPrimary,
-          matches: searchResult.map(r => ({
-            value: r.payload.value,
-            score: r.score,
-            text: r.payload.text
-          }))
+          all_results: allResults
         };
 
       } catch (error) {
@@ -221,7 +292,43 @@ class QdrantService {
 
     // All retries failed - return empty result gracefully
     console.error('⚠️ All Qdrant retries failed, falling back to programmatic matching');
-    return { match: null, score: 0, matches: [] };
+    return { match: null, score: 0, all_results: [] };
+  }
+
+  // NEW: Get all points from a category (for debugging)
+  async getAllPoints(category, limit = 100) {
+    if (!this.initialized) {
+      console.error('⚠️ Qdrant service not initialized');
+      return [];
+    }
+
+    try {
+      const response = await this.client.scroll(this.collectionName, {
+        filter: {
+          must: [
+            {
+              key: 'category',
+              match: { value: category }
+            }
+          ]
+        },
+        limit: limit,
+        with_payload: true,
+        with_vector: false
+      });
+      
+      return response.points.map(point => ({
+        id: point.id,
+        category: point.payload.category,
+        value: point.payload.value,
+        text: point.payload.text,
+        isPrimary: point.payload.isPrimary,
+        dynamicallyAdded: point.payload.dynamicallyAdded || false
+      }));
+    } catch (error) {
+      console.error('Error getting all points:', error);
+      return [];
+    }
   }
 
   async clearCollection() {
@@ -230,6 +337,7 @@ class QdrantService {
       console.log(`Deleted collection: ${this.collectionName}`);
       await this.ensureCollection();
       console.log('Collection cleared and recreated');
+      this.nextId = 1; // Reset ID counter
     } catch (error) {
       console.error('Error clearing collection:', error.message);
     }

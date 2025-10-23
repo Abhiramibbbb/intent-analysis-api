@@ -249,6 +249,52 @@ function extractActionText(userInput) {
   return foundVerb;
 }
 
+// Helper function to ensure reference phrases exist in Qdrant
+async function ensureReferencePhrasesExist(ref1_phrase, ref2_phrase, gold_standard, qdrantCategory) {
+  try {
+    console.log(`[VALIDATION] Checking if ref phrases exist in Qdrant...`);
+    
+    // Check if ref1 exists
+    const ref1Check = await qdrantService.searchSimilar(ref1_phrase, qdrantCategory, 100, 0.0);
+    let ref1Exists = false;
+    
+    if (ref1Check && ref1Check.all_results) {
+      ref1Exists = ref1Check.all_results.some(r => 
+        r.match.toLowerCase() === ref1_phrase.toLowerCase()
+      );
+    }
+    
+    // Check if ref2 exists
+    const ref2Check = await qdrantService.searchSimilar(ref2_phrase, qdrantCategory, 100, 0.0);
+    let ref2Exists = false;
+    
+    if (ref2Check && ref2Check.all_results) {
+      ref2Exists = ref2Check.all_results.some(r => 
+        r.match.toLowerCase() === ref2_phrase.toLowerCase()
+      );
+    }
+    
+    console.log(`[VALIDATION] Ref1 "${ref1_phrase}" exists: ${ref1Exists}`);
+    console.log(`[VALIDATION] Ref2 "${ref2_phrase}" exists: ${ref2Exists}`);
+    
+    // Add missing reference phrases
+    if (!ref1Exists) {
+      console.log(`[VALIDATION] ⚠️  Adding missing Ref1: "${ref1_phrase}"`);
+      await qdrantService.addPhrase(ref1_phrase, qdrantCategory, gold_standard);
+    }
+    
+    if (!ref2Exists) {
+      console.log(`[VALIDATION] ⚠️  Adding missing Ref2: "${ref2_phrase}"`);
+      await qdrantService.addPhrase(ref2_phrase, qdrantCategory, gold_standard);
+    }
+    
+    return { ref1Exists, ref2Exists, ref1Added: !ref1Exists, ref2Added: !ref2Exists };
+  } catch (error) {
+    console.error(`[VALIDATION] Error ensuring ref phrases exist:`, error.message);
+    return { ref1Exists: false, ref2Exists: false, ref1Added: false, ref2Added: false };
+  }
+}
+
 async function performCircleValidation(searchText, category) {
   const categoryMap = {
     'intent': 'intent', 'process': 'process', 'action': 'action',
@@ -312,6 +358,9 @@ async function performCircleValidation(searchText, category) {
     console.log(`   Ref1: "${ref1_phrase}"`);
     console.log(`   Ref2: "${ref2_phrase}"`);
 
+    // Ensure ref1 and ref2 exist in Qdrant
+    await ensureReferencePhrasesExist(ref1_phrase, ref2_phrase, gold_standard, qdrantCategory);
+
     console.log(`\n[VALIDATION] ┌─ CHECK 2A: Distance to Gold (< ${MAX_DISTANCE_TO_GOLD})`);
     console.log(`[VALIDATION] │  Distance: ${variables.variable2_distance_to_gold.toFixed(4)}`);
     
@@ -328,16 +377,29 @@ async function performCircleValidation(searchText, category) {
     console.log(`[VALIDATION] └─ ❌ FAILED`);
 
     console.log(`\n[VALIDATION] ┌─ CHECK 2B: Distance to Ref1 (< ${MAX_DISTANCE_TO_REF1})`);
-    const ref1_results = await qdrantService.searchSimilar(searchText, qdrantCategory, 10, 0.0);
+    
+    // Search for ref1 phrase with increased limit to find it
+    const ref1_results = await qdrantService.searchSimilar(searchText, qdrantCategory, 100, 0.0);
     let new_to_ref1_score = 0;
     
+    console.log(`[VALIDATION] │  Looking for ref1: "${ref1_phrase}"`);
+    
     if (ref1_results && ref1_results.all_results) {
-      const ref1Match = ref1_results.all_results.find(r => r.match.toLowerCase() === ref1_phrase.toLowerCase());
+      const ref1Match = ref1_results.all_results.find(r => 
+        r.match.toLowerCase() === ref1_phrase.toLowerCase()
+      );
+      
       if (ref1Match) {
         new_to_ref1_score = ref1Match.score;
+        console.log(`[VALIDATION] │  ✓ Found ref1 in results`);
       } else {
-        const directRef1 = await qdrantService.searchSimilar(searchText, qdrantCategory, 1, 0.0);
-        new_to_ref1_score = directRef1?.score || 0;
+        console.log(`[VALIDATION] │  ⚠️  Ref1 not found in top 100 results`);
+        // If not found, try direct search
+        const directRef1 = await qdrantService.searchSimilar(ref1_phrase, qdrantCategory, 1, 0.0);
+        if (directRef1 && directRef1.score) {
+          new_to_ref1_score = directRef1.score;
+          console.log(`[VALIDATION] │  ✓ Got ref1 score via direct search`);
+        }
       }
     }
     
@@ -361,16 +423,29 @@ async function performCircleValidation(searchText, category) {
     console.log(`[VALIDATION] └─ ❌ FAILED`);
 
     console.log(`\n[VALIDATION] ┌─ CHECK 2C: Distance to Ref2 (< ${MAX_DISTANCE_TO_REF2})`);
-    const ref2_results = await qdrantService.searchSimilar(searchText, qdrantCategory, 10, 0.0);
+    
+    // Search for ref2 phrase with increased limit to find it
+    const ref2_results = await qdrantService.searchSimilar(searchText, qdrantCategory, 100, 0.0);
     let new_to_ref2_score = 0;
     
+    console.log(`[VALIDATION] │  Looking for ref2: "${ref2_phrase}"`);
+    
     if (ref2_results && ref2_results.all_results) {
-      const ref2Match = ref2_results.all_results.find(r => r.match.toLowerCase() === ref2_phrase.toLowerCase());
+      const ref2Match = ref2_results.all_results.find(r => 
+        r.match.toLowerCase() === ref2_phrase.toLowerCase()
+      );
+      
       if (ref2Match) {
         new_to_ref2_score = ref2Match.score;
+        console.log(`[VALIDATION] │  ✓ Found ref2 in results`);
       } else {
-        const directRef2 = await qdrantService.searchSimilar(searchText, qdrantCategory, 1, 0.0);
-        new_to_ref2_score = directRef2?.score || 0;
+        console.log(`[VALIDATION] │  ⚠️  Ref2 not found in top 100 results`);
+        // If not found, try direct search
+        const directRef2 = await qdrantService.searchSimilar(ref2_phrase, qdrantCategory, 1, 0.0);
+        if (directRef2 && directRef2.score) {
+          new_to_ref2_score = directRef2.score;
+          console.log(`[VALIDATION] │  ✓ Got ref2 score via direct search`);
+        }
       }
     }
     
@@ -708,10 +783,10 @@ class ConversationAnalyzer {
           }
         }
         
-        if (earliestPosition === -1) {  // No known verb found, extract likely action word
+        if (earliestPosition === -1) {
           const intentPhrases = INTENT_DICTIONARY[this.analysis.intent.value]?.primary || [];
           let inputWords = input.split(/\s+/);
-          let actionIndex = inputWords.findIndex(word => intentPhrases.some(phrase => phrase.split(/\s+/).includes(word))) + 1;  // After intent
+          let actionIndex = inputWords.findIndex(word => intentPhrases.some(phrase => phrase.split(/\s+/).includes(word))) + 1;
           searchText = inputWords[actionIndex] || '';
         } else {
           const afterVerbPosition = earliestPosition + foundVerb.length;
@@ -974,6 +1049,39 @@ app.get('/qdrant-status', async (req, res) => {
     res.status(500).json({
       success: false, error: error.message, initialized: qdrantService.initialized,
       environment: { qdrant_url_set: !!process.env.QDRANT_URL, qdrant_api_key_set: !!process.env.QDRANT_API_KEY }
+    });
+  }
+});
+
+// Testing endpoint to search Qdrant
+app.post('/api/search-test', async (req, res) => {
+  try {
+    const { text, category, limit } = req.body;
+    
+    if (!text || !category) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'text and category are required' 
+      });
+    }
+    
+    const results = await qdrantService.searchSimilar(
+      text, 
+      category, 
+      limit || 50, 
+      0.0
+    );
+    
+    res.json({ 
+      success: true, 
+      search_text: text,
+      category: category,
+      results: results
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
     });
   }
 });
