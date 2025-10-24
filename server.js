@@ -11,8 +11,8 @@ const PORT = process.env.PORT || 3000;
 // Constants from Pseudocode - EXACT VALUES FROM PSEUDOCODE
 const SAFETY_FLOOR = 0.30;
 const MAX_DISTANCE_TO_GOLD = 0.5;
-const MAX_DISTANCE_TO_REF1 = 0.4;   // Changed from 0.15 to 0.2 as per pseudocode
-const MAX_DISTANCE_TO_REF2 = 0.3;   // Changed from 0.15 to 0.1 as per pseudocode
+const MAX_DISTANCE_TO_REF1 = 0.4;
+const MAX_DISTANCE_TO_REF2 = 0.3;
 
 const logs = [];
 
@@ -52,11 +52,11 @@ const REFERENCE_MAPPINGS = {
 // Pre-calculated Gold→Ref1 Scores - EXACT FROM PSEUDOCODE
 const GOLD_TO_REF1_SCORES = {
   intent: { 'i want to': 0.9, 'how do i': 0.95 },
-  action: { 'create': 0.9, 'modify': '0.95', 'search': 0.85, 'delete': 0.95 },
+  action: { 'create': 0.9, 'modify': 0.95, 'search': 0.85, 'delete': 0.95 },
   process: { 'objective': 0.85, 'key result': 0.5, 'initiative': 0.4, 'review meeting': 0.8, 'key result checkin': 0.9 },
   filter_name: { 'due': 0.8, 'priority': 0.8, 'status': 0.7, 'assigned': 0.75, 'quarter': 0.3942 },
   filter_operator: { 'equal to': 1, 'greater than': 1, 'less than': 1 },
-  filter_value: { 'today': 0.7743, 'high': 0.3951, 'pending': 0.5588, 'q1': '0.3209' }
+  filter_value: { 'today': 0.7743, 'high': 0.3951, 'pending': 0.5588, 'q1': 0.3209 }
 };
 
 // Pre-calculated Gold→Ref2 Scores - EXACT FROM PSEUDOCODE
@@ -193,7 +193,7 @@ function extractIntentText(userInput) {
 }
 
 function extractProcessText(userInput) {
-  const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find', 'generate', 'change', 'locate', 'erase', 'construct', 'draft', 'build', 'establish', 'develop'];
+  const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find', 'generate', 'change', 'locate', 'erase', 'construct', 'draft', 'build', 'establish', 'develop', 'commence'];
   const lowerInput = userInput.toLowerCase();
   let earliestPosition = -1;
   let foundVerb = '';
@@ -221,7 +221,7 @@ function extractProcessText(userInput) {
       }
     }
     
-    // Remove filter keywords FIRST
+    // Remove filter keywords
     const filterKeywords = ['with', 'where', 'having', 'for'];
     for (const keyword of filterKeywords) {
       const keywordPos = afterVerb.toLowerCase().indexOf(' ' + keyword + ' ');
@@ -232,7 +232,7 @@ function extractProcessText(userInput) {
       }
     }
     
-    // Extract ONLY first 1-2 words
+    // Extract first 1-2 words
     const words = afterVerb.split(/\s+/);
     
     // Check if first 2 words form multi-word process
@@ -244,13 +244,15 @@ function extractProcessText(userInput) {
       }
     }
     
-    // Return first word only
+    // Return first word as searchText for validation
     const processWord = words[0] || '';
-    console.log(`[EXTRACT] Single-word process: "${processWord}"`);
-    return processWord;
+    if (processWord) {
+      console.log(`[EXTRACT] Single-word process: "${processWord}"`);
+      return processWord;
+    }
   }
   
-  // Simplified fallback
+  // Fallback: Extract word after intent phrase
   const intentPhrases = ['i want to', 'i need to', 'i would like to', 'i wish to', 'i intend to', 
                          "i'm looking to", "i'm trying to", 'i am preparing to', 'i am planning to',
                          'i am aiming to', 'i am hoping to', 'i feel ready to',
@@ -262,10 +264,13 @@ function extractProcessText(userInput) {
       const afterIntent = lowerInput.substring(phraseIndex + phrase.length).trim();
       const words = afterIntent.split(/\s+/);
       
-      // Skip first word (action), return second word (process)
+      // Skip first word (action), return second word or first word if no action
       if (words.length >= 2) {
         console.log(`[EXTRACT] Fallback process: "${words[1]}"`);
         return words[1];
+      } else if (words.length >= 1) {
+        console.log(`[EXTRACT] Fallback process: "${words[0]}"`);
+        return words[0];
       }
     }
   }
