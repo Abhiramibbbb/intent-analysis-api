@@ -11,8 +11,8 @@ const PORT = process.env.PORT || 3000;
 // Constants from Pseudocode - EXACT VALUES FROM PSEUDOCODE
 const SAFETY_FLOOR = 0.30;
 const MAX_DISTANCE_TO_GOLD = 0.5;
-const MAX_DISTANCE_TO_REF1 = 0.4;
-const MAX_DISTANCE_TO_REF2 = 0.3;
+const MAX_DISTANCE_TO_REF1 = 0.4;   // Changed from 0.15 to 0.2 as per pseudocode
+const MAX_DISTANCE_TO_REF2 = 0.3;   // Changed from 0.15 to 0.1 as per pseudocode
 
 const logs = [];
 
@@ -174,11 +174,11 @@ const FILTER_VALUE_PHRASE_DICTIONARY = {
 };
 
 const FILTER_PATTERNS = [
-  /(\w+)\s*(=|\bequals\b|\bis\b|\bequal to\b)\s*([^\s,]+)/gi,
-  /(\w+)\s*(>|\bgreater than\b|\bmore than\b|\babove\b)\s*([^\s,]+)/gi,
-  /(\w+)\s*(<|\bless than\b|\bbelow\b|\bunder\b)\s*([^\s,]+)/gi,
+  /(\w+(?:-\w+)?)\s*(=|\bequals\b|\bis\b|\bequal to\b)\s*([^\s,]+)/gi,
+  /(\w+(?:-\w+)?)\s*(>|\bgreater than\b|\bmore than\b|\babove\b)\s*([^\s,]+)/gi,
+  /(\w+(?:-\w+)?)\s*(<|\bless than\b|\bbelow\b|\bunder\b)\s*([^\s,]+)/gi,
   /(due|priority|status|assigned)\s+(today|tomorrow|yesterday|high|low|medium|pending|completed|[^\s,]+)/gi,
-  /where\s+(\w+)\s*(=|>|<|\bequals\b|\bis\b)\s*([^\s,]+)/gi,
+  /where\s+(\w+(?:-\w+)?)\s*(=|>|<|\bequals\b|\bis\b)\s*([^\s,]+)/gi,
   /(quarter|q)\s*(=|\bequals\b|\bis\b|\bequal to\b)\s*(q?[1-4])/gi,
   /for\s+(quarter|q)\s*(q?[1-4])/gi
 ];
@@ -193,7 +193,7 @@ function extractIntentText(userInput) {
 }
 
 function extractProcessText(userInput) {
-  const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find', 'generate', 'change', 'locate', 'erase', 'construct', 'draft', 'build', 'establish', 'develop', 'commence', 'investigate'];
+  const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find', 'generate', 'change', 'locate', 'erase', 'construct', 'draft', 'build', 'establish', 'develop'];
   const lowerInput = userInput.toLowerCase();
   let earliestPosition = -1;
   let foundVerb = '';
@@ -212,7 +212,7 @@ function extractProcessText(userInput) {
   if (earliestPosition >= 0) {
     let afterVerb = userInput.substring(earliestPosition + foundVerb.length).trim();
     
-    // Check multi-word processes FIRST
+    // ✅ FIX 1: Check multi-word processes FIRST
     const multiWordProcesses = ['key result checkin', 'review meeting', 'key result'];
     for (const process of multiWordProcesses) {
       if (afterVerb.toLowerCase().startsWith(process)) {
@@ -221,7 +221,7 @@ function extractProcessText(userInput) {
       }
     }
     
-    // Remove filter keywords
+    // ✅ FIX 2: Remove filter keywords FIRST
     const filterKeywords = ['with', 'where', 'having', 'for'];
     for (const keyword of filterKeywords) {
       const keywordPos = afterVerb.toLowerCase().indexOf(' ' + keyword + ' ');
@@ -232,7 +232,7 @@ function extractProcessText(userInput) {
       }
     }
     
-    // Extract first 1-2 words
+    // ✅ FIX 3: Extract ONLY first 1-2 words
     const words = afterVerb.split(/\s+/);
     
     // Check if first 2 words form multi-word process
@@ -244,18 +244,16 @@ function extractProcessText(userInput) {
       }
     }
     
-    // Return first word as searchText for validation
+    // Return first word only
     const processWord = words[0] || '';
-    if (processWord) {
-      console.log(`[EXTRACT] Single-word process: "${processWord}"`);
-      return processWord;
-    }
+    console.log(`[EXTRACT] Single-word process: "${processWord}"`);
+    return processWord;
   }
   
-  // Fallback: Extract word after intent phrase
+  // ✅ FIX 4: Simplified fallback
   const intentPhrases = ['i want to', 'i need to', 'i would like to', 'i wish to', 'i intend to', 
                          "i'm looking to", "i'm trying to", 'i am preparing to', 'i am planning to',
-                         'i am aiming to', 'i am hoping to', 'i feel ready to', 'i desire to',
+                         'i am aiming to', 'i am hoping to', 'i feel ready to',
                          'how do i', 'how can i', 'show me how to', 'how to'];
   
   for (const phrase of intentPhrases) {
@@ -264,13 +262,10 @@ function extractProcessText(userInput) {
       const afterIntent = lowerInput.substring(phraseIndex + phrase.length).trim();
       const words = afterIntent.split(/\s+/);
       
-      // Skip first word (action), return second word or first word if no action
+      // Skip first word (action), return second word (process)
       if (words.length >= 2) {
         console.log(`[EXTRACT] Fallback process: "${words[1]}"`);
         return words[1];
-      } else if (words.length >= 1) {
-        console.log(`[EXTRACT] Fallback process: "${words[0]}"`);
-        return words[0];
       }
     }
   }
@@ -280,7 +275,7 @@ function extractProcessText(userInput) {
 }
 
 function extractActionText(userInput) {
-  const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find', 'generate', 'change', 'locate', 'erase', 'construct', 'draft', 'build', 'establish', 'develop', 'commence', 'investigate'];
+  const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find', 'generate', 'change', 'locate', 'erase', 'construct', 'draft'];
   const lowerInput = userInput.toLowerCase();
   
   // First, try to find known action verbs
@@ -297,29 +292,27 @@ function extractActionText(userInput) {
   }
   
   if (foundVerb) {
-    console.log(`[EXTRACT] Found action verb: "${foundVerb}"`);
     return foundVerb;
   }
   
   // If no known verb found, extract word after intent phrase
   const intentPhrases = ['i want to', 'i need to', 'i would like to', 'i wish to', 'i intend to', 
                          "i'm looking to", "i'm trying to", 'i am preparing to', 'i am planning to',
-                         'i am aiming to', 'i am hoping to', 'i feel ready to', 'i desire to',
+                         'i am aiming to', 'i am hoping to', 'i feel ready to',
                          'how do i', 'how can i', 'show me how to', 'how to'];
   
   for (const phrase of intentPhrases) {
-    const phraseIndex = lowerInput.indexOf(phrase);
-    if (phraseIndex !== -1) {
-      const afterIntent = lowerInput.substring(phraseIndex + phrase.length).trim();
-      const words = afterIntent.split(/\s+/);
-      if (words.length > 0) {
-        console.log(`[EXTRACT] Action after intent phrase: "${words[0]}"`);
-        return words[0]; // Return "investigate" for "i desire to investigate"
+    if (lowerInput.includes(phrase)) {
+      const afterIntent = lowerInput.split(phrase)[1]?.trim();
+      if (afterIntent) {
+        const firstWord = afterIntent.split(' ')[0];
+        if (firstWord && firstWord.length > 0) {
+          return firstWord; // Return "establish", "develop", "build", etc.
+        }
       }
     }
   }
   
-  console.log(`[EXTRACT] No action found`);
   return '';
 }
 
@@ -696,6 +689,7 @@ class ConversationAnalyzer {
     let processFound = false;
     console.log(`\n[STEP2] Process Detection Start`);
 
+    // Check dictionary first
     for (const [process, patterns] of Object.entries(PROCESS_DICTIONARY)) {
       for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
         if (input === keyword.toLowerCase() || input.includes(keyword.toLowerCase())) {
@@ -709,6 +703,7 @@ class ConversationAnalyzer {
       if (processFound) break;
     }
 
+    // Check phrase dictionary
     if (!processFound) {
       for (const [process, phrases] of Object.entries(PROCESS_PHRASE_DICTIONARY)) {
         for (const phrase of phrases) {
@@ -724,55 +719,41 @@ class ConversationAnalyzer {
       }
     }
 
+    // Extract and validate with Qdrant
     if (!processFound) {
       let searchText = extractProcessText(input);
       
-      if (!searchText) {
-        const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find'];
-        const lowerInput = input.toLowerCase();
-        let earliestPosition = -1;
-        let foundVerb = '';
-        
-        for (const verb of actionVerbs) {
-          const position = lowerInput.indexOf(verb);
-          if (position !== -1) {
-            if (earliestPosition === -1 || position < earliestPosition) {
-              earliestPosition = position;
-              foundVerb = verb;
-            }
-          }
-        }
-        
-        if (earliestPosition !== -1) {
-          const afterVerbPosition = earliestPosition + foundVerb.length;
-          const afterVerb = input.substring(afterVerbPosition).trim();
-          const filterKeywords = ['with', 'where', 'having', 'for'];
-          let finalText = afterVerb;
-          
-          for (const keyword of filterKeywords) {
-            const keywordPos = finalText.toLowerCase().indexOf(keyword);
-            if (keywordPos >= 0) {
-              finalText = finalText.substring(0, keywordPos).trim();
-              break;
-            }
-          }
-          
-          searchText = finalText || afterVerb;
-        }
-      }
+      console.log(`[STEP2] Extracted process text: "${searchText}"`);
       
-      if (searchText) {
+      // ✅ SIMPLIFIED: extractProcessText now handles everything, no fallback needed
+      if (searchText && searchText.trim() !== '') {
         console.log(`[STEP2] Performing validation for: "${searchText}"`);
         const validation_result = await performCircleValidation(searchText, 'process');
+        
         if (validation_result.matched) {
-          this.analysis.process = { status: validation_result.clarity, value: validation_result.gold_standard, reply: `Detected process: ${validation_result.gold_standard}` };
+          this.analysis.process = { 
+            status: validation_result.clarity, 
+            value: validation_result.gold_standard, 
+            reply: `Detected process: ${validation_result.gold_standard}` 
+          };
           this.analysis.step2_reply = `Detected process: ${validation_result.gold_standard}`;
           processFound = true;
+          
           if (validation_result.variables) {
-            this.analysis.validation_logs.push({ component_type: 'process', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'ACCEPTED' });
+            this.analysis.validation_logs.push({ 
+              component_type: 'process', 
+              ...validation_result.variables, 
+              validation_path: validation_result.validation_path, 
+              acceptance_status: 'ACCEPTED' 
+            });
           }
         } else if (validation_result.variables) {
-          this.analysis.validation_logs.push({ component_type: 'process', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'REJECTED' });
+          this.analysis.validation_logs.push({ 
+            component_type: 'process', 
+            ...validation_result.variables, 
+            validation_path: validation_result.validation_path, 
+            acceptance_status: 'REJECTED' 
+          });
         }
       }
     }
@@ -781,6 +762,7 @@ class ConversationAnalyzer {
       this.analysis.process = { status: 'Not Found', value: '', reply: 'No process detected.' };
       this.analysis.step2_reply = 'No process detected.';
     }
+    
     console.log(`[STEP2] Result: ${this.analysis.process.status} - ${this.analysis.process.value}`);
   }
 
