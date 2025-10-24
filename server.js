@@ -118,11 +118,11 @@ const FILTER_VALUE_DICTIONARY = {
   'today': { primary: ['today'], synonyms: ['this day', 'current date'] },
   'tomorrow': { primary: ['tomorrow'], synonyms: [] },
   'yesterday': { primary: ['yesterday'], synonyms: [] },
-  'high': { primary: ['high'], synonyms: ['critical', 'top priority'] },
-  'low': { primary: ['low'], synonyms: [] },
-  'medium': { primary: ['medium'], synonyms: [] },
-  'pending': { primary: ['pending'], synonyms: ['ongoing', 'unfinished'] },
-  'completed': { primary: ['completed'], synonyms: ['done'] },
+  'high': { primary: ['high'], synonyms: ['critical', 'top priority', 'urgent'] },
+  'low': { primary: ['low'], synonyms: ['minor'] },
+  'medium': { primary: ['medium'], synonyms: ['normal'] },
+  'pending': { primary: ['pending'], synonyms: ['ongoing', 'unfinished', 'in progress', 'open'] },
+  'completed': { primary: ['completed'], synonyms: ['done', 'closed'] },
   'q1': { primary: ['q1'], synonyms: ['quarter 1', 'first quarter', 'Q one'] },
   'q2': { primary: ['q2'], synonyms: ['quarter 2'] },
   'q3': { primary: ['q3'], synonyms: ['quarter 3'] },
@@ -267,7 +267,7 @@ function extractProcessText(userInput) {
   const intentPhrases = ['i want to', 'i need to', 'i would like to', 'i wish to', 'i intend to', 
                          "i'm looking to", "i'm trying to", 'i am preparing to', 'i am planning to',
                          'i am aiming to', 'i am hoping to', 'i feel ready to',
-                         'how do i', 'how can i', 'show me how to', 'how to'];
+                         'how do i', 'how can i', 'show me how', 'how to'];
   
   for (const phrase of intentPhrases) {
     const phraseIndex = lowerInput.indexOf(phrase);
@@ -904,6 +904,7 @@ class ConversationAnalyzer {
     }
 
     const detectedFilters = [];
+    const filterSet = new Set(); // To track unique filter combinations
     for (const pattern of FILTER_PATTERNS) {
       let match;
       while ((match = pattern.exec(input)) !== null) {
@@ -911,10 +912,14 @@ class ConversationAnalyzer {
         const operator = match[2] || match[5] || '=';
         const value = match[3] || match[6];
         if (filterName && value) {
-          detectedFilters.push({
-            name: filterName.toLowerCase(), operator: operator.toLowerCase(), value: value.toLowerCase(),
-            name_status: 'Not Found', operator_status: 'Not Found', value_status: 'Not Found'
-          });
+          const filterKey = `${filterName}_${operator}_${value}`; // Unique key for deduplication
+          if (!filterSet.has(filterKey)) {
+            detectedFilters.push({
+              name: filterName.toLowerCase(), operator: operator.toLowerCase(), value: value.toLowerCase(),
+              name_status: 'Not Found', operator_status: 'Not Found', value_status: 'Not Found'
+            });
+            filterSet.add(filterKey);
+          }
         }
       }
     }
