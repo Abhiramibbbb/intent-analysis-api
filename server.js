@@ -192,44 +192,88 @@ function extractIntentText(userInput) {
   return userInput.split(' ').slice(0, 4).join(' ');
 }
 
-function extractProcessText(userInput) {
-  const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find'];
-  const lowerInput = userInput.toLowerCase();
-  let earliestPosition = -1;
-  let foundVerb = '';
-  
-  for (const verb of actionVerbs) {
-    const position = lowerInput.indexOf(verb);
-    if (position !== -1) {
-      if (earliestPosition === -1 || position < earliestPosition) {
-        earliestPosition = position;
-        foundVerb = verb;
-      }
-    }
-  }
-  
-  if (earliestPosition >= 0) {
-    let afterVerb = userInput.substring(earliestPosition + foundVerb.length).trim();
-    
-    const multiWordProcesses = ['key result checkin', 'review meeting', 'key result'];
-    
-    for (const process of multiWordProcesses) {
-      if (afterVerb.toLowerCase().startsWith(process)) {
-        return process;
-      }
-    }
-    
-    const filterKeywords = ['with', 'where', 'having', 'for'];
-    for (const keyword of filterKeywords) {
-      const keywordPos = afterVerb.toLowerCase().indexOf(keyword);
-      if (keywordPos >= 0) {
-        afterVerb = afterVerb.substring(0, keywordPos).trim();
+async step2_processConclusion(userInput) {
+  const input = userInput.toLowerCase().trim();
+  let processFound = false;
+  console.log(`\n[STEP2] Process Detection Start`);
+
+  // Check dictionary first
+  for (const [process, patterns] of Object.entries(PROCESS_DICTIONARY)) {
+    for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
+      if (input === keyword.toLowerCase() || input.includes(keyword.toLowerCase())) {
+        this.analysis.process = { status: 'Clear', value: process, reply: `Detected process: ${process}` };
+        this.analysis.step2_reply = `Detected process: ${process}`;
+        processFound = true;
+        console.log(`[STEP2] ✓ Found in dictionary: "${keyword}" → ${process}`);
         break;
       }
     }
-    return afterVerb;
+    if (processFound) break;
   }
-  return '';
+
+  // Check phrase dictionary
+  if (!processFound) {
+    for (const [process, phrases] of Object.entries(PROCESS_PHRASE_DICTIONARY)) {
+      for (const phrase of phrases) {
+        if (input.includes(phrase.toLowerCase())) {
+          this.analysis.process = { status: 'Adequate Clarity', value: process, reply: `Detected process: ${process}` };
+          this.analysis.step2_reply = `Detected process: ${process}`;
+          processFound = true;
+          console.log(`[STEP2] ✓ Found in phrase dictionary: "${phrase}" → ${process}`);
+          break;
+        }
+      }
+      if (processFound) break;
+    }
+  }
+
+  // Extract and validate with Qdrant
+  if (!processFound) {
+    let searchText = extractProcessText(input);
+    
+    console.log(`[STEP2] Extracted process text: "${searchText}"`);
+    
+    // If extraction failed, try to get the last word(s) after action
+    if (!searchText || searchText.trim() === '') {
+      const intentPhrases = ['i want to', 'i need to', 'i would like to', "i'm hoping to", "i'm trying to"];
+      let afterIntent = input;
+      
+      for (const phrase of intentPhrases) {
+        if (afterIntent.includes(phrase)) {
+          afterIntent = afterIntent.split(phrase)[1]?.trim() || '';
+          break;
+        }
+      }
+      
+      if (afterIntent) {
+        const words = afterIntent.split(' ');
+        // Get last word as potential process
+        searchText = words[words.length - 1];
+        console.log(`[STEP2] Fallback: Using last word as process: "${searchText}"`);
+      }
+    }
+    
+    if (searchText && searchText.trim() !== '') {
+      console.log(`[STEP2] Performing validation for: "${searchText}"`);
+      const validation_result = await performCircleValidation(searchText, 'process');
+      if (validation_result.matched) {
+        this.analysis.process = { status: validation_result.clarity, value: validation_result.gold_standard, reply: `Detected process: ${validation_result.gold_standard}` };
+        this.analysis.step2_reply = `Detected process: ${validation_result.gold_standard}`;
+        processFound = true;
+        if (validation_result.variables) {
+          this.analysis.validation_logs.push({ component_type: 'process', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'ACCEPTED' });
+        }
+      } else if (validation_result.variables) {
+        this.analysis.validation_logs.push({ component_type: 'process', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'REJECTED' });
+      }
+    }
+  }
+
+  if (!processFound) {
+    this.analysis.process = { status: 'Not Found', value: '', reply: 'No process detected.' };
+    this.analysis.step2_reply = 'No process detected.';
+  }
+  console.log(`[STEP2] Result: ${this.analysis.process.status} - ${this.analysis.process.value}`);
 }
 
 // FIXED: Extract action text properly, skipping intent phrases
