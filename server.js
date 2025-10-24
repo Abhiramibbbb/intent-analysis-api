@@ -109,7 +109,7 @@ const FILTER_NAME_DICTIONARY = {
 };
 
 const FILTER_OPERATOR_DICTIONARY = {
-  'equal to': { primary: ['=', 'equals', 'is'], synonyms: ['equal to'] },
+  'equal to': { primary: ['=', 'equals', 'is'], synonyms: ['equal to', 'exactly'] },
   'greater than': { primary: ['>', 'greater than'], synonyms: ['more than'] },
   'less than': { primary: ['<', 'less than'], synonyms: ['below'] }
 };
@@ -170,7 +170,7 @@ const FILTER_NAME_PHRASE_DICTIONARY = {
 };
 
 const FILTER_OPERATOR_PHRASE_DICTIONARY = {
-  'equal to': ['same as', 'matches', 'is exactly'],
+  'equal to': ['same as', 'matches', 'is exactly', 'exactly'],
   'greater than': ['exceeds', 'higher than', 'above'],
   'less than': ['under', 'lower than', 'lesser than']
 };
@@ -187,12 +187,12 @@ const FILTER_VALUE_PHRASE_DICTIONARY = {
 };
 
 const FILTER_PATTERNS = [
-  /(\w+(?:-\w+)?)\s*(=|\bequals\b|\bis\b|\bequal to\b)\s*([^\s,]+)/gi,
-  /(\w+(?:-\w+)?)\s*(>|\bgreater than\b|\bmore than\b|\babove\b)\s*([^\s,]+)/gi,
-  /(\w+(?:-\w+)?)\s*(<|\bless than\b|\bbelow\b|\bunder\b)\s*([^\s,]+)/gi,
+  /([\w\s-]+)\s*(=|\bequals\b|\bis\b|\bequal to\b|\bexactly\b|\bis exactly\b)\s*([^\s,]+)/gi,
+  /([\w\s-]+)\s*(>|\bgreater than\b|\bmore than\b|\babove\b)\s*([^\s,]+)/gi,
+  /([\w\s-]+)\s*(<|\bless than\b|\bbelow\b|\bunder\b)\s*([^\s,]+)/gi,
   /(due|priority|status|assigned)\s+(today|tomorrow|yesterday|high|low|medium|pending|completed|[^\s,]+)/gi,
-  /where\s+(\w+(?:-\w+)?)\s*(=|>|<|\bequals\b|\bis\b)\s*([^\s,]+)/gi,
-  /(quarter|q)\s*(=|\bequals\b|\bis\b|\bequal to\b)\s*(q?[1-4])/gi,
+  /where\s+([\w\s-]+)\s*(=|>|<|\bequals\b|\bis\b|\bexactly\b|\bis exactly\b)\s*([^\s,]+)/gi,
+  /(quarter|q)\s*(=|\bequals\b|\bis\b|\bequal to\b|\bexactly\b|\bis exactly\b)\s*(q?[1-4])/gi,
   /for\s+(quarter|q)\s*(q?[1-4])/gi
 ];
 
@@ -225,7 +225,7 @@ function extractProcessText(userInput) {
   if (earliestPosition >= 0) {
     let afterVerb = userInput.substring(earliestPosition + foundVerb.length).trim();
     
-    // ✅ FIX 1: Check multi-word processes FIRST
+    // Check multi-word processes FIRST
     const multiWordProcesses = ['key result checkin', 'review meeting', 'key result'];
     for (const process of multiWordProcesses) {
       if (afterVerb.toLowerCase().startsWith(process)) {
@@ -234,7 +234,7 @@ function extractProcessText(userInput) {
       }
     }
     
-    // ✅ FIX 2: Remove filter keywords FIRST
+    // Remove filter keywords FIRST
     const filterKeywords = ['with', 'where', 'having', 'for'];
     for (const keyword of filterKeywords) {
       const keywordPos = afterVerb.toLowerCase().indexOf(' ' + keyword + ' ');
@@ -245,7 +245,7 @@ function extractProcessText(userInput) {
       }
     }
     
-    // ✅ FIX 3: Extract ONLY first 1-2 words
+    // Extract ONLY first 1-2 words
     const words = afterVerb.split(/\s+/);
     
     // Check if first 2 words form multi-word process
@@ -263,7 +263,7 @@ function extractProcessText(userInput) {
     return processWord;
   }
   
-  // ✅ FIX 4: Simplified fallback
+  // Simplified fallback
   const intentPhrases = ['i want to', 'i need to', 'i would like to', 'i wish to', 'i intend to', 
                          "i'm looking to", "i'm trying to", 'i am preparing to', 'i am planning to',
                          'i am aiming to', 'i am hoping to', 'i feel ready to',
@@ -738,7 +738,6 @@ class ConversationAnalyzer {
       
       console.log(`[STEP2] Extracted process text: "${searchText}"`);
       
-      // ✅ SIMPLIFIED: extractProcessText now handles everything, no fallback needed
       if (searchText && searchText.trim() !== '') {
         console.log(`[STEP2] Performing validation for: "${searchText}"`);
         const validation_result = await performCircleValidation(searchText, 'process');
@@ -908,9 +907,9 @@ class ConversationAnalyzer {
     for (const pattern of FILTER_PATTERNS) {
       let match;
       while ((match = pattern.exec(input)) !== null) {
-        const filterName = match[1] || match[4];
-        const operator = match[2] || match[5] || '=';
-        const value = match[3] || match[6];
+        const filterName = match[1] ? match[1].trim() : match[4] ? match[4].trim() : '';
+        const operator = match[2] ? match[2].trim() : match[5] ? match[5].trim() : '=';
+        const value = match[3] ? match[3].trim() : match[6] ? match[6].trim() : '';
         if (filterName && value) {
           const filterKey = `${filterName}_${operator}_${value}`; // Unique key for deduplication
           if (!filterSet.has(filterKey)) {
