@@ -191,6 +191,87 @@ function extractIntentText(userInput) {
   }
   return userInput.split(' ').slice(0, 4).join(' ');
 }
+function extractProcessText(userInput) {
+  const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find', 'generate', 'change', 'locate', 'erase', 'construct', 'draft', 'build', 'establish', 'develop'];
+  const lowerInput = userInput.toLowerCase();
+  let earliestPosition = -1;
+  let foundVerb = '';
+  
+  // Find earliest action verb
+  for (const verb of actionVerbs) {
+    const position = lowerInput.indexOf(verb);
+    if (position !== -1) {
+      if (earliestPosition === -1 || position < earliestPosition) {
+        earliestPosition = position;
+        foundVerb = verb;
+      }
+    }
+  }
+  
+  if (earliestPosition >= 0) {
+    let afterVerb = userInput.substring(earliestPosition + foundVerb.length).trim();
+    
+    // ✅ FIX 1: Check multi-word processes FIRST
+    const multiWordProcesses = ['key result checkin', 'review meeting', 'key result'];
+    for (const process of multiWordProcesses) {
+      if (afterVerb.toLowerCase().startsWith(process)) {
+        console.log(`[EXTRACT] Found multi-word process: "${process}"`);
+        return process;
+      }
+    }
+    
+    // ✅ FIX 2: Remove filter keywords FIRST
+    const filterKeywords = ['with', 'where', 'having', 'for'];
+    for (const keyword of filterKeywords) {
+      const keywordPos = afterVerb.toLowerCase().indexOf(' ' + keyword + ' ');
+      if (keywordPos >= 0) {
+        afterVerb = afterVerb.substring(0, keywordPos).trim();
+        console.log(`[EXTRACT] After filter removal: "${afterVerb}"`);
+        break;
+      }
+    }
+    
+    // ✅ FIX 3: Extract ONLY first 1-2 words
+    const words = afterVerb.split(/\s+/);
+    
+    // Check if first 2 words form multi-word process
+    if (words.length >= 2) {
+      const twoWords = `${words[0]} ${words[1]}`.toLowerCase();
+      if (multiWordProcesses.includes(twoWords)) {
+        console.log(`[EXTRACT] 2-word process: "${twoWords}"`);
+        return twoWords;
+      }
+    }
+    
+    // Return first word only
+    const processWord = words[0] || '';
+    console.log(`[EXTRACT] Single-word process: "${processWord}"`);
+    return processWord;
+  }
+  
+  // ✅ FIX 4: Simplified fallback
+  const intentPhrases = ['i want to', 'i need to', 'i would like to', 'i wish to', 'i intend to', 
+                         "i'm looking to", "i'm trying to", 'i am preparing to', 'i am planning to',
+                         'i am aiming to', 'i am hoping to', 'i feel ready to',
+                         'how do i', 'how can i', 'show me how to', 'how to'];
+  
+  for (const phrase of intentPhrases) {
+    const phraseIndex = lowerInput.indexOf(phrase);
+    if (phraseIndex !== -1) {
+      const afterIntent = lowerInput.substring(phraseIndex + phrase.length).trim();
+      const words = afterIntent.split(/\s+/);
+      
+      // Skip first word (action), return second word (process)
+      if (words.length >= 2) {
+        console.log(`[EXTRACT] Fallback process: "${words[1]}"`);
+        return words[1];
+      }
+    }
+  }
+  
+  console.log(`[EXTRACT] No process found`);
+  return '';
+}
 
 async step2_processConclusion(userInput) {
   const input = userInput.toLowerCase().trim();
@@ -233,38 +314,35 @@ async step2_processConclusion(userInput) {
     
     console.log(`[STEP2] Extracted process text: "${searchText}"`);
     
-    // If extraction failed, try to get the last word(s) after action
-    if (!searchText || searchText.trim() === '') {
-      const intentPhrases = ['i want to', 'i need to', 'i would like to', "i'm hoping to", "i'm trying to"];
-      let afterIntent = input;
-      
-      for (const phrase of intentPhrases) {
-        if (afterIntent.includes(phrase)) {
-          afterIntent = afterIntent.split(phrase)[1]?.trim() || '';
-          break;
-        }
-      }
-      
-      if (afterIntent) {
-        const words = afterIntent.split(' ');
-        // Get last word as potential process
-        searchText = words[words.length - 1];
-        console.log(`[STEP2] Fallback: Using last word as process: "${searchText}"`);
-      }
-    }
-    
+    // ✅ SIMPLIFIED: extractProcessText now handles everything, no fallback needed
     if (searchText && searchText.trim() !== '') {
       console.log(`[STEP2] Performing validation for: "${searchText}"`);
       const validation_result = await performCircleValidation(searchText, 'process');
+      
       if (validation_result.matched) {
-        this.analysis.process = { status: validation_result.clarity, value: validation_result.gold_standard, reply: `Detected process: ${validation_result.gold_standard}` };
+        this.analysis.process = { 
+          status: validation_result.clarity, 
+          value: validation_result.gold_standard, 
+          reply: `Detected process: ${validation_result.gold_standard}` 
+        };
         this.analysis.step2_reply = `Detected process: ${validation_result.gold_standard}`;
         processFound = true;
+        
         if (validation_result.variables) {
-          this.analysis.validation_logs.push({ component_type: 'process', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'ACCEPTED' });
+          this.analysis.validation_logs.push({ 
+            component_type: 'process', 
+            ...validation_result.variables, 
+            validation_path: validation_result.validation_path, 
+            acceptance_status: 'ACCEPTED' 
+          });
         }
       } else if (validation_result.variables) {
-        this.analysis.validation_logs.push({ component_type: 'process', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'REJECTED' });
+        this.analysis.validation_logs.push({ 
+          component_type: 'process', 
+          ...validation_result.variables, 
+          validation_path: validation_result.validation_path, 
+          acceptance_status: 'REJECTED' 
+        });
       }
     }
   }
@@ -273,6 +351,7 @@ async step2_processConclusion(userInput) {
     this.analysis.process = { status: 'Not Found', value: '', reply: 'No process detected.' };
     this.analysis.step2_reply = 'No process detected.';
   }
+  
   console.log(`[STEP2] Result: ${this.analysis.process.status} - ${this.analysis.process.value}`);
 }
 
