@@ -115,10 +115,18 @@ const FILTER_OPERATOR_DICTIONARY = {
 };
 
 const FILTER_VALUE_DICTIONARY = {
-  'date': { primary: ['today', 'tomorrow', 'yesterday'], synonyms: [] },
-  'priority': { primary: ['high', 'low', 'medium'], synonyms: [] },
-  'status': { primary: ['pending', 'completed'], synonyms: ['done'] },
-  'quarter': { primary: ['q1', 'q2', 'q3', 'q4', 'quarter 1', 'quarter 2', 'quarter 3', 'quarter 4'], synonyms: [] }
+  'today': { primary: ['today'], synonyms: ['this day', 'current date'] },
+  'tomorrow': { primary: ['tomorrow'], synonyms: [] },
+  'yesterday': { primary: ['yesterday'], synonyms: [] },
+  'high': { primary: ['high'], synonyms: ['critical', 'top priority'] },
+  'low': { primary: ['low'], synonyms: [] },
+  'medium': { primary: ['medium'], synonyms: [] },
+  'pending': { primary: ['pending'], synonyms: ['ongoing', 'unfinished'] },
+  'completed': { primary: ['completed'], synonyms: ['done'] },
+  'q1': { primary: ['q1'], synonyms: ['quarter 1', 'first quarter', 'Q one'] },
+  'q2': { primary: ['q2'], synonyms: ['quarter 2'] },
+  'q3': { primary: ['q3'], synonyms: ['quarter 3'] },
+  'q4': { primary: ['q4'], synonyms: ['quarter 4'] }
 };
 
 const INTENT_PHRASE_TO_CATEGORY = {
@@ -168,9 +176,14 @@ const FILTER_OPERATOR_PHRASE_DICTIONARY = {
 };
 
 const FILTER_VALUE_PHRASE_DICTIONARY = {
-  'date': ['this week', 'next week', 'last week'],
-  'priority': ['urgent', 'normal', 'minor'],
-  'status': ['in progress', 'open', 'closed']
+  'this week': ['this week'],
+  'next week': ['next week'],
+  'last week': ['last week'],
+  'high': ['urgent'],
+  'medium': ['normal'],
+  'low': ['minor'],
+  'pending': ['in progress', 'open'],
+  'completed': ['closed']
 };
 
 const FILTER_PATTERNS = [
@@ -529,69 +542,58 @@ async function performCircleValidation(searchText, category) {
       console.log(`${'='.repeat(80)}\n`);
       return {
         matched: true, gold_standard, clarity: 'Adequate Clarity',
-        variables, validation_path: 'REF2'
+        variables,
+        validation_path: 'REF2'
       };
     }
     console.log(`[VALIDATION] └─ ❌ FAILED`);
-    console.log(`[VALIDATION] ❌ REJECTED - All checks failed`);
+
+    console.log(`[VALIDATION] ❌ ALL CHECKS FAILED`);
     console.log(`${'='.repeat(80)}\n`);
     return { matched: false, gold_standard, clarity: null, variables, validation_path: 'NONE' };
-
   } catch (error) {
-    console.error(`[VALIDATION] ❌ ERROR:`, error.message);
+    console.error('[VALIDATION] Error:', error.message);
     console.log(`${'='.repeat(80)}\n`);
-    return { matched: false, gold_standard: null, clarity: null, variables: null, validation_path: 'NONE' };
+    return { matched: false, gold_standard: null, clarity: null, variables: null, validation_path: 'ERROR' };
   }
 }
 
-// ============================================================================
-// VALIDATION LOGGING UTILITY
-// ============================================================================
-
-function logValidationSummary(validationLogs) {
-  if (!validationLogs || validationLogs.length === 0) {
-    console.log('\n[VALIDATION SUMMARY] No validation checks performed\n');
-    return;
-  }
-
-  console.log('\n' + '='.repeat(80));
+function logValidationSummary(validation_logs) {
+  console.log('================================================================================');
   console.log('VALIDATION SUMMARY');
-  console.log('='.repeat(80));
+  console.log('================================================================================');
+  console.log(`Total Checks: ${validation_logs.length}`);
+  console.log(`✅ Accepted: ${validation_logs.filter(log => log.acceptance_status === 'ACCEPTED').length}`);
+  console.log(`❌ Rejected: ${validation_logs.filter(log => log.acceptance_status === 'REJECTED').length}`);
   
-  const accepted = validationLogs.filter(log => log.acceptance_status === 'ACCEPTED');
-  const rejected = validationLogs.filter(log => log.acceptance_status === 'REJECTED');
-  
-  console.log(`\nTotal Checks: ${validationLogs.length}`);
-  console.log(`✅ Accepted: ${accepted.length}`);
-  console.log(`❌ Rejected: ${rejected.length}`);
-  
-  if (accepted.length > 0) {
-    console.log('\n--- ACCEPTED VALIDATIONS ---');
-    accepted.forEach((log, index) => {
-      console.log(`\n[${index + 1}] Component: ${log.component_type.toUpperCase()}`);
-      console.log(`    New Value: "${log.variable1_new_value}"`);
-      console.log(`    Distance to Gold: ${log.variable2_distance_to_gold?.toFixed(4) || 'N/A'}`);
-      console.log(`    Distance to Ref1: ${log.variable3_distance_to_ref1?.toFixed(4) || 'N/A'}`);
-      console.log(`    Distance to Ref2: ${log.variable4_distance_to_ref2?.toFixed(4) || 'N/A'}`);
-      console.log(`    Validation Path: ${log.validation_path}`);
-      console.log(`    Status: ✅ ${log.acceptance_status}`);
+  if (validation_logs.length > 0) {
+    console.log('--- ACCEPTED VALIDATIONS ---');
+    validation_logs.forEach((log, index) => {
+      if (log.acceptance_status === 'ACCEPTED') {
+        console.log(`[${index + 1}] Component: ${log.component_type.toUpperCase()}`);
+        console.log(`    New Value: "${log.variable1_new_value}"`);
+        console.log(`    Distance to Gold: ${log.variable2_distance_to_gold.toFixed(4)}`);
+        console.log(`    Distance to Ref1: ${log.variable3_distance_to_ref1 ? log.variable3_distance_to_ref1.toFixed(4) : 'N/A'}`);
+        console.log(`    Distance to Ref2: ${log.variable4_distance_to_ref2 ? log.variable4_distance_to_ref2.toFixed(4) : 'N/A'}`);
+        console.log(`    Validation Path: ${log.validation_path}`);
+        console.log(`    Status: ✅ ACCEPTED`);
+      }
+    });
+    
+    console.log('--- REJECTED VALIDATIONS ---');
+    validation_logs.forEach((log, index) => {
+      if (log.acceptance_status === 'REJECTED') {
+        console.log(`[${index + 1}] Component: ${log.component_type.toUpperCase()}`);
+        console.log(`    New Value: "${log.variable1_new_value}"`);
+        console.log(`    Distance to Gold: ${log.variable2_distance_to_gold.toFixed(4)}`);
+        console.log(`    Distance to Ref1: ${log.variable3_distance_to_ref1 ? log.variable3_distance_to_ref1.toFixed(4) : 'N/A'}`);
+        console.log(`    Distance to Ref2: ${log.variable4_distance_to_ref2 ? log.variable4_distance_to_ref2.toFixed(4) : 'N/A'}`);
+        console.log(`    Validation Path: ${log.validation_path}`);
+        console.log(`    Status: ❌ REJECTED`);
+      }
     });
   }
-  
-  if (rejected.length > 0) {
-    console.log('\n--- REJECTED VALIDATIONS ---');
-    rejected.forEach((log, index) => {
-      console.log(`\n[${index + 1}] Component: ${log.component_type.toUpperCase()}`);
-      console.log(`    New Value: "${log.variable1_new_value}"`);
-      console.log(`    Distance to Gold: ${log.variable2_distance_to_gold?.toFixed(4) || 'N/A'}`);
-      console.log(`    Distance to Ref1: ${log.variable3_distance_to_ref1?.toFixed(4) || 'N/A'}`);
-      console.log(`    Distance to Ref2: ${log.variable4_distance_to_ref2?.toFixed(4) || 'N/A'}`);
-      console.log(`    Validation Path: ${log.validation_path}`);
-      console.log(`    Status: ❌ ${log.acceptance_status}`);
-    });
-  }
-  
-  console.log('\n' + '='.repeat(80) + '\n');
+  console.log('================================================================================');
 }
 
 class ConversationAnalyzer {
@@ -601,24 +603,23 @@ class ConversationAnalyzer {
 
   reset() {
     this.analysis = {
-      userInput: '', intent: { status: 'Not Found', value: '', reply: '' },
+      userInput: '',
+      intent: { status: 'Not Found', value: '', reply: '' },
       process: { status: 'Not Found', value: '', reply: '' },
       action: { status: 'Not Found', value: '', reply: '' },
       filters: { status: 'Not Found', value: [], reply: '' },
-      finalAnalysis: '', suggested_action: '', example_query: '',
-      proceed_button: false, redirect_flag: false, redirect_url: null,
-      step1_reply: '', step2_reply: '', step3_reply: '', step4_reply: '',
-      validation_logs: []
+      finalAnalysis: '',
+      proceed_button: false,
+      redirect_flag: false,
+      redirect_url: '',
+      suggested_action: '',
+      example_query: '',
+      validation_logs: [],
+      step1_reply: '',
+      step2_reply: '',
+      step3_reply: '',
+      step4_reply: ''
     };
-  }
-
-  hasAnyKeywords(input) {
-    const allKeywords = [
-      ...Object.values(INTENT_DICTIONARY).flatMap(d => [...d.primary, ...d.synonyms]),
-      ...Object.values(ACTION_DICTIONARY).flatMap(d => [...d.primary, ...d.synonyms]),
-      ...Object.values(PROCESS_DICTIONARY).flatMap(d => [...d.primary, ...d.synonyms])
-    ];
-    return allKeywords.some(keyword => input.includes(keyword.toLowerCase()));
   }
 
   async step1_intentConclusion(userInput) {
@@ -626,25 +627,27 @@ class ConversationAnalyzer {
     let intentFound = false;
     console.log(`\n[STEP1] Intent Detection Start`);
 
+    // Check dictionary first
     for (const [intent, patterns] of Object.entries(INTENT_DICTIONARY)) {
-      for (const pattern of [...patterns.primary, ...patterns.synonyms]) {
-        if (input.includes(pattern.toLowerCase())) {
-          this.analysis.intent = { status: 'Clear', value: intent, reply: 'Your intent is clear.' };
-          this.analysis.step1_reply = 'Your intent is clear.';
+      for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
+        if (input.startsWith(keyword.toLowerCase())) {
+          this.analysis.intent = { status: 'Clear', value: intent, reply: `Detected intent: ${intent}` };
+          this.analysis.step1_reply = `Detected intent: ${intent}`;
           intentFound = true;
-          console.log(`[STEP1] ✓ Found in dictionary: "${pattern}" → ${intent}`);
+          console.log(`[STEP1] ✓ Found in dictionary: "${keyword}" → ${intent}`);
           break;
         }
       }
       if (intentFound) break;
     }
 
+    // Check phrase dictionary
     if (!intentFound) {
       for (const [intent, phrases] of Object.entries(INTENT_PHRASE_DICTIONARY)) {
         for (const phrase of phrases) {
-          if (input.includes(phrase.toLowerCase())) {
-            this.analysis.intent = { status: 'Adequate Clarity', value: intent, reply: 'Your intent seems somewhat clear.' };
-            this.analysis.step1_reply = 'Your intent seems somewhat clear.';
+          if (input.startsWith(phrase.toLowerCase())) {
+            this.analysis.intent = { status: 'Adequate Clarity', value: intent, reply: `Detected intent: ${intent}` };
+            this.analysis.step1_reply = `Detected intent: ${intent}`;
             intentFound = true;
             console.log(`[STEP1] ✓ Found in phrase dictionary: "${phrase}" → ${intent}`);
             break;
@@ -654,31 +657,41 @@ class ConversationAnalyzer {
       }
     }
 
+    // Extract and validate with Qdrant
     if (!intentFound) {
-      const searchText = extractIntentText(input);
-      console.log(`[STEP1] Performing validation for: "${searchText}"`);
-      const validation_result = await performCircleValidation(searchText, 'intent');
-
-      if (validation_result.matched) {
-        const detectedIntent = INTENT_PHRASE_TO_CATEGORY[validation_result.gold_standard] || validation_result.gold_standard;
-        this.analysis.intent = { status: validation_result.clarity, value: detectedIntent, reply: `Detected intent: ${detectedIntent}` };
-        this.analysis.step1_reply = `Detected intent: ${detectedIntent}`;
-        intentFound = true;
-        if (validation_result.variables) {
-          this.analysis.validation_logs.push({ component_type: 'intent', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'ACCEPTED' });
+      let searchText = extractIntentText(input);
+      if (searchText && searchText.trim() !== '') {
+        console.log(`[STEP1] Performing validation for: "${searchText}"`);
+        const validation_result = await performCircleValidation(searchText, 'intent');
+        if (validation_result.matched) {
+          const category = INTENT_PHRASE_TO_CATEGORY[validation_result.gold_standard.toLowerCase()] || 'menu';
+          this.analysis.intent = { 
+            status: validation_result.clarity, 
+            value: category, 
+            reply: `Detected intent: ${category}` 
+          };
+          this.analysis.step1_reply = `Detected intent: ${category}`;
+          intentFound = true;
+          
+          if (validation_result.variables) {
+            this.analysis.validation_logs.push({ 
+              component_type: 'intent', 
+              ...validation_result.variables, 
+              validation_path: validation_result.validation_path, 
+              acceptance_status: 'ACCEPTED' 
+            });
+          }
+        } else if (validation_result.variables) {
+          this.analysis.validation_logs.push({ 
+            component_type: 'intent', 
+            ...validation_result.variables, 
+            validation_path: validation_result.validation_path, 
+            acceptance_status: 'REJECTED' 
+          });
         }
-      } else if (validation_result.variables) {
-        this.analysis.validation_logs.push({ component_type: 'intent', ...validation_result.variables, validation_path: validation_result.validation_path, acceptance_status: 'REJECTED' });
-      }
-    }
-
-    if (!intentFound) {
-      if (this.hasAnyKeywords(input)) {
-        this.analysis.intent = { status: 'Not Clear', value: '', reply: 'Unable to determine your intent.' };
-        this.analysis.step1_reply = 'Unable to determine your intent.';
       } else {
-        this.analysis.intent = { status: 'Not Found', value: '', reply: 'No intent detected.' };
-        this.analysis.step1_reply = 'No intent detected.';
+        this.analysis.intent = { status: 'Not Found', value: '', reply: 'Unable to determine your intent.' };
+        this.analysis.step1_reply = 'Unable to determine your intent.';
       }
     }
     console.log(`[STEP1] Result: ${this.analysis.intent.status} - ${this.analysis.intent.value}`);
