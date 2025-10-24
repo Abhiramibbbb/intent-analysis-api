@@ -56,7 +56,7 @@ const GOLD_TO_REF1_SCORES = {
   process: { 'objective': 0.85, 'key result': 0.5, 'initiative': 0.4, 'review meeting': 0.8, 'key result checkin': 0.9 },
   filter_name: { 'due': 0.8, 'priority': 0.8, 'status': 0.7, 'assigned': 0.75, 'quarter': 0.3942 },
   filter_operator: { 'equal to': 1, 'greater than': 1, 'less than': 1 },
-  filter_value: { 'today': 0.7743, 'high': 0.3951, 'pending': 0.5588, 'q1': 0.3209 }
+  filter_value: { 'today': 0.7743, 'high': 0.3951, 'pending': 0.5588, 'q1': '0.3209' }
 };
 
 // Pre-calculated Gold→Ref2 Scores - EXACT FROM PSEUDOCODE
@@ -401,7 +401,7 @@ async function performCircleValidation(searchText, category) {
     if (new_to_gold_score < SAFETY_FLOOR) {
       console.log(`[VALIDATION] └─ ❌ FAILED: ${new_to_gold_score.toFixed(4)} < ${SAFETY_FLOOR}`);
       console.log(`${'='.repeat(80)}\n`);
-      return { matched: false synergies gold_standard, clarity: null, variables: null, validation_path: 'NONE' };
+      return { matched: false, gold_standard, clarity: null, variables: null, validation_path: 'NONE' };
     }
     console.log(`[VALIDATION] └─ ✅ PASSED: ${new_to_gold_score.toFixed(4)} ≥ ${SAFETY_FLOOR}`);
 
