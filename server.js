@@ -232,9 +232,12 @@ function extractProcessText(userInput) {
   return '';
 }
 
+// FIXED: Extract action text properly, skipping intent phrases
 function extractActionText(userInput) {
   const actionVerbs = ['create', 'modify', 'update', 'search', 'delete', 'add', 'remove', 'find', 'generate', 'change', 'locate', 'erase', 'construct', 'draft'];
   const lowerInput = userInput.toLowerCase();
+  
+  // First, try to find known action verbs
   let earliestPosition = -1;
   let foundVerb = '';
   for (const verb of actionVerbs) {
@@ -246,9 +249,31 @@ function extractActionText(userInput) {
       }
     }
   }
-  return foundVerb;
+  
+  if (foundVerb) {
+    return foundVerb;
+  }
+  
+  // If no known verb found, extract word after intent phrase
+  const intentPhrases = ['i want to', 'i need to', 'i would like to', 'i wish to', 'i intend to', 
+                         "i'm looking to", "i'm trying to", 'i am preparing to', 'i am planning to',
+                         'i am aiming to', 'i am hoping to', 'i feel ready to',
+                         'how do i', 'how can i', 'show me how to', 'how to'];
+  
+  for (const phrase of intentPhrases) {
+    if (lowerInput.includes(phrase)) {
+      const afterIntent = lowerInput.split(phrase)[1]?.trim();
+      if (afterIntent) {
+        const firstWord = afterIntent.split(' ')[0];
+        if (firstWord && firstWord.length > 0) {
+          return firstWord; // Return "establish", "develop", "build", etc.
+        }
+      }
+    }
+  }
+  
+  return '';
 }
-
 // Helper function to ensure reference phrases exist in Qdrant
 async function ensureReferencePhrasesExist(ref1_phrase, ref2_phrase, gold_standard, qdrantCategory) {
   try {
