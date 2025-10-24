@@ -166,7 +166,8 @@ const FILTER_NAME_PHRASE_DICTIONARY = {
   'due': ['when it is due', 'due by', 'completion date'],
   'priority': ['level of urgency', 'importance level', 'priority of'],
   'status': ['current state', 'progress status', 'condition of'],
-  'assigned': ['who is responsible', 'assigned person', 'task owner']
+  'assigned': ['who is responsible', 'assigned person', 'task owner'],
+  'quarter': ['reporting period']
 };
 
 const FILTER_OPERATOR_PHRASE_DICTIONARY = {
@@ -902,11 +903,17 @@ class ConversationAnalyzer {
       return;
     }
 
+    let filter_input = input;
+    const where_index = input.indexOf('where');
+    if (where_index !== -1) {
+      filter_input = input.substring(where_index + 5).trim();
+    }
+
     const detectedFilters = [];
     const filterSet = new Set(); // To track unique filter combinations
     for (const pattern of FILTER_PATTERNS) {
       let match;
-      while ((match = pattern.exec(input)) !== null) {
+      while ((match = pattern.exec(filter_input)) !== null) {
         const filterName = match[1] ? match[1].trim() : match[4] ? match[4].trim() : '';
         const operator = match[2] ? match[2].trim() : match[5] ? match[5].trim() : '=';
         const value = match[3] ? match[3].trim() : match[6] ? match[6].trim() : '';
