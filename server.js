@@ -741,7 +741,7 @@ class ConversationAnalyzer {
     for (const process of processOrder) {
       if (!PROCESS_DICTIONARY[process]) continue;
       
-      const patterns = PROCESS_DICTIONARY[process];
+      const patterns = PROCESS_DICTIONARY[process);
       for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
         if (input === keyword.toLowerCase() || input.includes(keyword.toLowerCase())) {
           this.analysis.process = { status: 'Clear', value: process, reply: `Detected process: ${process}` };
@@ -1260,26 +1260,7 @@ app.post('/api/analyze', async (req, res) => {
     if (!sentence || sentence.trim() === '') {
       return res.status(400).json({ success: false, error: 'Sentence is required' });
     }
-    if <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Server.js with Updated extractProcessText</title>
-</head>
-<body>
-    <h1>Updated server.js Code</h1>
-    <p>The code above is the complete <code>server.js</code> file with the updated <code>extractProcessText</code> function integrated. The changes include:</p>
-    <ul>
-        <li>Replaced the original <code>extractProcessText</code> function with the provided version.</li>
-        <li>Added validation to check if the extracted first word is in the <code>validProcesses</code> array (<code>['objective', 'key', 'result', 'initiative', 'review', 'meeting', 'checkin']</code>) in both the main logic and fallback logic.</li>
-        <li>Removed the complex multi-word combination checks (e.g., checking 2-word or 3-word combinations) from the original function, simplifying the process extraction.</li>
-        <li>Retained the multi-word process checks for <code>['key result checkin', 'key result check in', 'review meeting', 'key result']</code> in the main logic.</li>
-        <li>Ensured the function returns an empty string if no valid process is found, with a console log for debugging.</li>
-    </ul>
-    <p>All other parts of the original <code>server.js</code> file remain unchanged, including dictionaries, mappings, validation logic, and API endpoints.</p>
-</body>
-</html> (!qdrantService.initialized) {
+    if (!qdrantService.initialized) {
       return res.status(503).json({ success: false, error: 'Service initializing. Please try again.' });
     }
     
