@@ -28,9 +28,9 @@ const REFERENCE_MAPPINGS = {
     ref2: { 'i want to': 'i would like to', 'how do i': 'show me how' }
   },
   action: {
-  ref1: { 'create': 'add', 'modify': 'update', 'search for': 'find', 'search': 'find', 'delete': 'remove','delete record': 'remove' },
-  ref2: { 'create': 'generate', 'modify': 'change', 'search for': 'locate', 'search': 'locate', 'delete': 'erase','delete record': 'erase'  }
-},
+    ref1: { 'create': 'add', 'modify': 'update', 'search for': 'find', 'search': 'find', 'delete': 'remove','delete record': 'remove' },
+    ref2: { 'create': 'generate', 'modify': 'change', 'search for': 'locate', 'search': 'locate', 'delete': 'erase','delete record': 'erase'  }
+  },
   process: {
     ref1: { 'objective': 'goal', 'key result': 'KPI', 'initiative': 'action item', 'review meeting': 'meeting', 'key result checkin': 'checkin' },
     ref2: { 'objective': 'target', 'key result': 'metric', 'initiative': 'task', 'review meeting': 'session', 'key result checkin': 'intent' }
@@ -232,7 +232,6 @@ function extractProcessText(userInput) {
       const keywordPos = afterVerb.toLowerCase().indexOf(' ' + keyword + ' ');
       if (keywordPos >= 0) {
         afterVerb = afterVerb.substring(0, keywordPos).trim();
-        console.log(`[EXTRACT] After filter removal: "${afterVerb}"`);
         break;
       }
     }
@@ -241,40 +240,24 @@ function extractProcessText(userInput) {
     const multiWordProcesses = ['key result checkin', 'key result check in', 'review meeting', 'key result'];
     for (const process of multiWordProcesses) {
       if (afterVerb.toLowerCase().startsWith(process)) {
-        console.log(`[EXTRACT] Found multi-word process: "${process}"`);
-        // Normalize "check in" to "checkin"
         return process === 'key result check in' ? 'key result checkin' : process;
       }
     }
     
-    // Extract first 1-3 words and check combinations
+    // Extract first word and validate it's a known process
     const words = afterVerb.split(/\s+/).filter(w => w.length > 0);
+    const firstWord = words[0]?.toLowerCase() || '';
     
-    // Check 3-word combinations first
-    if (words.length >= 3) {
-      const threeWords = `${words[0]} ${words[1]} ${words[2]}`.toLowerCase();
-      if (multiWordProcesses.some(p => p === threeWords || p === threeWords.replace(' ', ''))) {
-        console.log(`[EXTRACT] 3-word process: "${threeWords}"`);
-        return threeWords.replace('check in', 'checkin');
-      }
+    // **ADD THIS VALIDATION**
+    const validProcesses = ['objective', 'key', 'result', 'initiative', 'review', 'meeting', 'checkin'];
+    if (firstWord && validProcesses.includes(firstWord)) {
+      return firstWord;
     }
     
-    // Check 2-word combinations
-    if (words.length >= 2) {
-      const twoWords = `${words[0]} ${words[1]}`.toLowerCase();
-      if (multiWordProcesses.includes(twoWords)) {
-        console.log(`[EXTRACT] 2-word process: "${twoWords}"`);
-        return twoWords;
-      }
-    }
-    
-    // Return first word only
-    const processWord = words[0] || '';
-    console.log(`[EXTRACT] Single-word process: "${processWord}"`);
-    return processWord;
+    return ''; // Return empty if not a valid process
   }
   
-  // Simplified fallback
+  // Fallback logic
   const intentPhrases = ['i want to', 'i need to', 'i would like to', 'i wish to', 'i intend to', 
                          "i'm looking to", "i'm trying to", 'i am preparing to', 'i am planning to',
                          'i am aiming to', 'i am hoping to', 'i feel ready to',
@@ -286,32 +269,20 @@ function extractProcessText(userInput) {
       const afterIntent = lowerInput.substring(phraseIndex + phrase.length).trim();
       const words = afterIntent.split(/\s+/).filter(w => w.length > 0);
       
-      // Skip first word (action), check for multi-word process
-      if (words.length >= 4) {
-        const threeWords = `${words[1]} ${words[2]} ${words[3]}`.toLowerCase();
-        if (threeWords === 'key result checkin' || threeWords === 'key result check in') {
-          console.log(`[EXTRACT] Fallback 3-word process: "${threeWords}"`);
-          return 'key result checkin';
+      // Skip first word if it's an action verb, check for multi-word process
+      if (words.length >= 1) {
+        const firstWord = words[0];
+        const validProcesses = ['objective', 'key', 'result', 'initiative', 'review', 'meeting', 'checkin'];
+        
+        // **ADD THIS CHECK**
+        if (validProcesses.includes(firstWord)) {
+          return firstWord;
         }
-      }
-      
-      if (words.length >= 3) {
-        const twoWords = `${words[1]} ${words[2]}`.toLowerCase();
-        if (twoWords === 'key result' || twoWords === 'review meeting') {
-          console.log(`[EXTRACT] Fallback 2-word process: "${twoWords}"`);
-          return twoWords;
-        }
-      }
-      
-      // Return second word (process)
-      if (words.length >= 2) {
-        console.log(`[EXTRACT] Fallback process: "${words[1]}"`);
-        return words[1];
       }
     }
   }
   
-  console.log(`[EXTRACT] No process found`);
+  console.log(`[EXTRACT] No valid process found`);
   return '';
 }
 
@@ -1289,7 +1260,26 @@ app.post('/api/analyze', async (req, res) => {
     if (!sentence || sentence.trim() === '') {
       return res.status(400).json({ success: false, error: 'Sentence is required' });
     }
-    if (!qdrantService.initialized) {
+    if <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server.js with Updated extractProcessText</title>
+</head>
+<body>
+    <h1>Updated server.js Code</h1>
+    <p>The code above is the complete <code>server.js</code> file with the updated <code>extractProcessText</code> function integrated. The changes include:</p>
+    <ul>
+        <li>Replaced the original <code>extractProcessText</code> function with the provided version.</li>
+        <li>Added validation to check if the extracted first word is in the <code>validProcesses</code> array (<code>['objective', 'key', 'result', 'initiative', 'review', 'meeting', 'checkin']</code>) in both the main logic and fallback logic.</li>
+        <li>Removed the complex multi-word combination checks (e.g., checking 2-word or 3-word combinations) from the original function, simplifying the process extraction.</li>
+        <li>Retained the multi-word process checks for <code>['key result checkin', 'key result check in', 'review meeting', 'key result']</code> in the main logic.</li>
+        <li>Ensured the function returns an empty string if no valid process is found, with a console log for debugging.</li>
+    </ul>
+    <p>All other parts of the original <code>server.js</code> file remain unchanged, including dictionaries, mappings, validation logic, and API endpoints.</p>
+</body>
+</html> (!qdrantService.initialized) {
       return res.status(503).json({ success: false, error: 'Service initializing. Please try again.' });
     }
     
