@@ -82,7 +82,8 @@ const CATEGORY_TO_GOLD_PHRASE = {
 // Dictionaries
 const INTENT_DICTIONARY = {
   'menu': { primary: ['i would like to', 'i want to', 'i need to', 'i wish to', 'i intend to'], synonyms: [] },
-  'help': { primary: ['how do i', 'does the system support', 'is there capability to', 'where can i', "what's the best way to"], synonyms: [] }
+  'help': { primary: ['how do i', 'does the system support', 'is there capability to', 'where can i', "what's the best way to"], synonyms: [] },
+  'greeting': { primary: ['hello', 'hi', 'how are you', 'hey'], synonyms: [] }
 };
 
 const ACTION_DICTIONARY = {
@@ -842,6 +843,14 @@ class ConversationAnalyzer {
     let actionFound = false;
     console.log(`\n[STEP3] Action Detection Start`);
 
+    if (this.analysis.intent.value === 'greeting') {
+      this.analysis.action = { status: 'Not Applicable', value: '', reply: 'No action required for greeting.' };
+      this.analysis.step3_reply = 'No action required for greeting.';
+      actionFound = true;
+      console.log(`[STEP3] ✓ Greeting intent - action not applicable`);
+      return;
+    }
+
     for (const [action, patterns] of Object.entries(ACTION_DICTIONARY)) {
       for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
         if (input.includes(keyword.toLowerCase())) {
@@ -1089,8 +1098,7 @@ class ConversationAnalyzer {
 
     const allValid = 
       (intentStatus === 'Clear' || intentStatus === 'Adequate Clarity') &&
-      (processStatus === 'Clear' || processStatus === 'Adequate Clarity') &&
-      (actionStatus === 'Clear' || actionStatus === 'Adequate Clarity') &&
+      (actionStatus === 'Clear' || actionStatus === 'Adequate Clarity' || actionStatus === 'Not Applicable') &&
       (filterStatus === 'Clear' || filterStatus === 'Adequate Clarity' || filterStatus === 'Not Applicable' || filterStatus === 'Not Found');
 
     if (allValid) {
@@ -1105,8 +1113,8 @@ class ConversationAnalyzer {
     } else {
       let failures = [];
       if (intentStatus !== 'Clear' && intentStatus !== 'Adequate Clarity') failures.push('intent');
-      if (processStatus !== 'Clear' && processStatus !== 'Adequate Clarity') failures.push('process');
-      if (actionStatus !== 'Clear' && actionStatus !== 'Adequate Clarity') failures.push('action');
+      if (processStatus !== 'Clear' && processStatus !== 'Adequate Clarity' && intentValue !== 'greeting') failures.push('process');
+      if (actionStatus !== 'Clear' && actionStatus !== 'Adequate Clarity' && actionStatus !== 'Not Applicable') failures.push('action');
       if (filterStatus === 'Not Clear') failures.push('filters');
       this.analysis.finalAnalysis = `Unable to determine: ${failures.join(', ')}.`;
       this.analysis.proceed_button = false;
