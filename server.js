@@ -1102,12 +1102,16 @@ class ConversationAnalyzer {
       (filterStatus === 'Clear' || filterStatus === 'Adequate Clarity' || filterStatus === 'Not Applicable' || filterStatus === 'Not Found');
 
     if (allValid) {
-      let filterText = '';
-      if (filterStatus === 'Clear' || filterStatus === 'Adequate Clarity') {
-        const filterDescriptions = this.analysis.filters.value.map(f => `${f.name} ${f.operator} ${f.value}`).join(', ');
-        filterText = ` with filters: ${filterDescriptions}`;
+      if (intentValue === 'greeting') {
+        this.analysis.finalAnalysis = "Hello! I'm here to assist you today. How can I help?";
+      } else {
+        let filterText = '';
+        if (filterStatus === 'Clear' || filterStatus === 'Adequate Clarity') {
+          const filterDescriptions = this.analysis.filters.value.map(f => `${f.name} ${f.operator} ${f.value}`).join(', ');
+          filterText = ` with filters: ${filterDescriptions}`;
+        }
+        this.analysis.finalAnalysis = `Your request is understood and ready to proceed.${filterText}`;
       }
-      this.analysis.finalAnalysis = `Your intent is clear to ${actionValue} on ${processValue}${filterText}.`;
       this.analysis.proceed_button = true;
       console.log(`[STEP5] ✅ Analysis successful`);
     } else {
