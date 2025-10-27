@@ -741,7 +741,7 @@ class ConversationAnalyzer {
     for (const process of processOrder) {
       if (!PROCESS_DICTIONARY[process]) continue;
       
-      const patterns = PROCESS_DICTIONARY[process);
+      const patterns = PROCESS_DICTIONARY[process];
       for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
         if (input === keyword.toLowerCase() || input.includes(keyword.toLowerCase())) {
           this.analysis.process = { status: 'Clear', value: process, reply: `Detected process: ${process}` };
