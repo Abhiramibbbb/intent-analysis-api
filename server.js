@@ -655,6 +655,40 @@ class ConversationAnalyzer {
     let intentFound = false;
     console.log(`\n[STEP1] Intent Detection Start`);
 
+    // Check for negations - these should be rejected
+    const negationPatterns = ["don't", "dont", "do not", "doesn't", "does not", "won't", "will not", "can't", "cannot", "shouldn't", "should not"];
+    for (const negation of negationPatterns) {
+      if (input.includes(negation)) {
+        this.analysis.intent = { status: 'Not Clear', value: '', reply: 'Negation detected. Please rephrase as a positive statement.' };
+        this.analysis.step1_reply = 'Negation detected. Please rephrase as a positive statement.';
+        console.log(`[STEP1] ❌ Negation detected: "${negation}"`);
+        return;
+      }
+    }
+
+    // Check for question format - should be help intent or rejected
+    const questionWords = ['should i', 'could i', 'can i', 'may i', 'would i', 'will i', 'shall i'];
+    for (const questionWord of questionWords) {
+      if (input.startsWith(questionWord)) {
+        // This is a question, likely needs help
+        this.analysis.intent = { status: 'Not Clear', value: '', reply: 'Question format detected. Please use "how do I" for help or "I want to" for actions.' };
+        this.analysis.step1_reply = 'Question format detected. Please use "how do I" for help or "I want to" for actions.';
+        console.log(`[STEP1] ❌ Question format detected: "${questionWord}"`);
+        return;
+      }
+    }
+
+    // Check for weak/conditional intent
+    const weakIntentWords = ['might', 'maybe', 'perhaps', 'possibly', 'probably', 'thinking about', 'considering', 'contemplating'];
+    for (const weakWord of weakIntentWords) {
+      if (input.includes(weakWord)) {
+        this.analysis.intent = { status: 'Not Clear', value: '', reply: 'Uncertain intent detected. Please state clearly what you want to do.' };
+        this.analysis.step1_reply = 'Uncertain intent detected. Please state clearly what you want to do.';
+        console.log(`[STEP1] ❌ Weak intent detected: "${weakWord}"`);
+        return;
+      }
+    }
+
     // Check dictionary first
     for (const [intent, patterns] of Object.entries(INTENT_DICTIONARY)) {
       for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
@@ -1071,6 +1105,16 @@ class ConversationAnalyzer {
     const intentValue = this.analysis.intent.value;
     const processValue = this.analysis.process.value;
     const actionValue = this.analysis.action.value;
+
+    // Check if intent was rejected due to negation, question, or weak intent
+    if (intentStatus === 'Not Clear') {
+      this.analysis.finalAnalysis = this.analysis.intent.reply;
+      this.analysis.proceed_button = false;
+      this.analysis.suggested_action = 'Please rephrase your request clearly.';
+      this.analysis.example_query = 'Example: "I want to create an objective"';
+      console.log(`[STEP5] ❌ Intent was rejected: ${this.analysis.intent.reply}`);
+      return;
+    }
 
     const allValid = 
       (intentStatus === 'Clear' || intentStatus === 'Adequate Clarity') &&
