@@ -97,7 +97,7 @@ const PROCESS_DICTIONARY = {
   'key result': { primary: ['key result'], synonyms: ['KPI'] },
   'initiative': { primary: ['initiative'], synonyms: ['action item'] },
   'review meeting': { primary: ['review meeting'], synonyms: ['meeting'] },
-  'key result checkin': { primary: ['key result checkin'], synonyms: ['checkin'] }
+  'key result checkin': { primary: ['key result checkin', 'key result check in'], synonyms: ['checkin', 'check in'] }
 };
 
 const FILTER_NAME_DICTIONARY = {
@@ -226,15 +226,6 @@ function extractProcessText(userInput) {
   if (earliestPosition >= 0) {
     let afterVerb = userInput.substring(earliestPosition + foundVerb.length).trim();
     
-    // Check multi-word processes FIRST
-    const multiWordProcesses = ['key result checkin', 'review meeting', 'key result'];
-    for (const process of multiWordProcesses) {
-      if (afterVerb.toLowerCase().startsWith(process)) {
-        console.log(`[EXTRACT] Found multi-word process: "${process}"`);
-        return process;
-      }
-    }
-    
     // Remove filter keywords FIRST
     const filterKeywords = ['with', 'where', 'having', 'for'];
     for (const keyword of filterKeywords) {
@@ -246,10 +237,29 @@ function extractProcessText(userInput) {
       }
     }
     
-    // Extract ONLY first 1-2 words
-    const words = afterVerb.split(/\s+/);
+    // Check multi-word processes in order of longest first (CRITICAL!)
+    const multiWordProcesses = ['key result checkin', 'key result check in', 'review meeting', 'key result'];
+    for (const process of multiWordProcesses) {
+      if (afterVerb.toLowerCase().startsWith(process)) {
+        console.log(`[EXTRACT] Found multi-word process: "${process}"`);
+        // Normalize "check in" to "checkin"
+        return process === 'key result check in' ? 'key result checkin' : process;
+      }
+    }
     
-    // Check if first 2 words form multi-word process
+    // Extract first 1-3 words and check combinations
+    const words = afterVerb.split(/\s+/).filter(w => w.length > 0);
+    
+    // Check 3-word combinations first
+    if (words.length >= 3) {
+      const threeWords = `${words[0]} ${words[1]} ${words[2]}`.toLowerCase();
+      if (multiWordProcesses.some(p => p === threeWords || p === threeWords.replace(' ', ''))) {
+        console.log(`[EXTRACT] 3-word process: "${threeWords}"`);
+        return threeWords.replace('check in', 'checkin');
+      }
+    }
+    
+    // Check 2-word combinations
     if (words.length >= 2) {
       const twoWords = `${words[0]} ${words[1]}`.toLowerCase();
       if (multiWordProcesses.includes(twoWords)) {
@@ -274,9 +284,26 @@ function extractProcessText(userInput) {
     const phraseIndex = lowerInput.indexOf(phrase);
     if (phraseIndex !== -1) {
       const afterIntent = lowerInput.substring(phraseIndex + phrase.length).trim();
-      const words = afterIntent.split(/\s+/);
+      const words = afterIntent.split(/\s+/).filter(w => w.length > 0);
       
-      // Skip first word (action), return second word (process)
+      // Skip first word (action), check for multi-word process
+      if (words.length >= 4) {
+        const threeWords = `${words[1]} ${words[2]} ${words[3]}`.toLowerCase();
+        if (threeWords === 'key result checkin' || threeWords === 'key result check in') {
+          console.log(`[EXTRACT] Fallback 3-word process: "${threeWords}"`);
+          return 'key result checkin';
+        }
+      }
+      
+      if (words.length >= 3) {
+        const twoWords = `${words[1]} ${words[2]}`.toLowerCase();
+        if (twoWords === 'key result' || twoWords === 'review meeting') {
+          console.log(`[EXTRACT] Fallback 2-word process: "${twoWords}"`);
+          return twoWords;
+        }
+      }
+      
+      // Return second word (process)
       if (words.length >= 2) {
         console.log(`[EXTRACT] Fallback process: "${words[1]}"`);
         return words[1];
