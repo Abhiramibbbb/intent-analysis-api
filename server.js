@@ -28,9 +28,9 @@ const REFERENCE_MAPPINGS = {
     ref2: { 'i want to': 'i would like to', 'how do i': 'show me how' }
   },
   action: {
-    ref1: { 'create': 'add', 'modify': 'update', 'search': 'find', 'delete': 'remove' },
-    ref2: { 'create': 'generate', 'modify': 'change', 'search': 'locate', 'delete': 'erase' }
-  },
+  ref1: { 'create': 'add', 'modify': 'update', 'search for': 'find', 'search': 'find', 'delete': 'remove' },
+  ref2: { 'create': 'generate', 'modify': 'change', 'search for': 'locate', 'search': 'locate', 'delete': 'erase' }
+},
   process: {
     ref1: { 'objective': 'goal', 'key result': 'KPI', 'initiative': 'action item', 'review meeting': 'meeting', 'key result checkin': 'checkin' },
     ref2: { 'objective': 'target', 'key result': 'metric', 'initiative': 'task', 'review meeting': 'session', 'key result checkin': 'intent' }
@@ -52,7 +52,7 @@ const REFERENCE_MAPPINGS = {
 // Pre-calculated Gold→Ref1 Scores - EXACT FROM PSEUDOCODE
 const GOLD_TO_REF1_SCORES = {
   intent: { 'i want to': 0.9, 'how do i': 0.95 },
-  action: { 'create': 0.9, 'modify': 0.95, 'search': 0.85, 'delete': 0.95 },
+  action: { 'create': 0.9, 'modify': 0.95, 'search': 0.85,'search for': 0.85, 'delete': 0.95 },
   process: { 'objective': 0.85, 'key result': 0.5, 'initiative': 0.4, 'review meeting': 0.8, 'key result checkin': 0.9 },
   filter_name: { 'due': 0.8, 'priority': 0.8, 'status': 0.7, 'assigned': 0.75, 'quarter': 0.3942 },
   filter_operator: { 'equal to': 1, 'greater than': 1, 'less than': 1 },
@@ -62,7 +62,7 @@ const GOLD_TO_REF1_SCORES = {
 // Pre-calculated Gold→Ref2 Scores - EXACT FROM PSEUDOCODE
 const GOLD_TO_REF2_SCORES = {
   intent: { 'i want to': 0.98, 'how do i': 0.9 },
-  action: { 'create': 0.6, 'modify': 0.9, 'search': 0.8, 'delete': 0.85 },
+  action: { 'create': 0.6, 'modify': 0.9, 'search': 0.8, 'search for': 0.8,'delete': 0.85 },
   process: { 'objective': 0.5, 'key result': 0.5, 'initiative': 0.3, 'review meeting': 0.7, 'key result checkin': 0.1245 },
   filter_name: { 'due': 0.3, 'priority': 0.8, 'status': 0.7, 'assigned': 0.9, 'quarter': 0.2 },
   filter_operator: { 'equal to': 1, 'greater than': 1, 'less than': 1 },
