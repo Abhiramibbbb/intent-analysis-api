@@ -1077,66 +1077,65 @@ class ConversationAnalyzer {
   }
 
   step5_finalAnalysis() {
-    console.log(`\n[STEP5] Final Analysis Start`);
-    const intentStatus = this.analysis.intent.status;
-    const processStatus = this.analysis.process.status;
-    const actionStatus = this.analysis.action.status;
-    const filterStatus = this.analysis.filters.status;
-    const intentValue = this.analysis.intent.value;
-    const processValue = this.analysis.process.value;
-    const actionValue = this.analysis.action.value;
+  console.log(`\n[STEP5] Final Analysis Start`);
+  const intentStatus = this.analysis.intent.status;
+  const processStatus = this.analysis.process.status;
+  const actionStatus = this.analysis.action.status;
+  const filterStatus = this.analysis.filters.status;
+  const intentValue = this.analysis.intent.value;
+  const processValue = this.analysis.process.value;
+  const actionValue = this.analysis.action.value;
 
-    // Check if intent was rejected due to negation, question, or weak intent
-    if (intentStatus === 'Not Clear') {
-      this.analysis.finalAnalysis = this.analysis.intent.reply;
-      this.analysis.proceed_button = false;
-      this.analysis.suggested_action = 'Please rephrase your request clearly.';
-      this.analysis.example_query = 'Example: "I want to create an objective"';
-      console.log(`[STEP5] ❌ Intent was rejected: ${this.analysis.intent.reply}`);
-      return;
-    }
-
-    const allValid = 
-      (intentStatus === 'Clear' || intentStatus === 'Adequate Clarity') &&
-      (actionStatus === 'Clear' || actionStatus === 'Adequate Clarity' || actionStatus === 'Not Applicable') &&
-      (filterStatus === 'Clear' || filterStatus === 'Adequate Clarity' || filterStatus === 'Not Applicable' || filterStatus === 'Not Found');
-
-    if (allValid) {
-      if (intentValue === 'greeting') {
-        this.analysis.finalAnalysis = "Hello! I'm here to assist you today. How can I help?";
-      } else {
-        let filterText = '';
-        if (filterStatus === 'Clear' || filterStatus === 'Adequate Clarity') {
-          const filterDescriptions = this.analysis.filters.value.map(f => `${f.name} ${f.operator} ${f.value}`).join(', ');
-          filterText = ` with filters: ${filterDescriptions}`;
-        }
-        this.analysis.finalAnalysis = `Your request is understood and ready to proceed.${filterText}`;
-      }
-      this.analysis.proceed_button = true;
-      console.log(`[STEP5] ✅ Analysis successful`);
-    } else {
-      let failures = [];
-      if (intentStatus !== 'Clear' && intentStatus !== 'Adequate Clarity') failures.push('intent');
-      if (processStatus !== 'Clear' && processStatus !== 'Adequate Clarity' && intentValue !== 'greeting') failures.push('process');
-      if (actionStatus !== 'Clear' && actionStatus !== 'Adequate Clarity' && actionStatus !== 'Not Applicable') failures.push('action');
-      if (filterStatus === 'Not Clear') failures.push('filters');
-      this.analysis.finalAnalysis = `Unable to determine: ${failures.join(', ')}.`;
-      this.analysis.proceed_button = false;
-      console.log(`[STEP5] ❌ Analysis incomplete - failures: ${failures.join(', ')}`);
-
-      if (intentValue === 'menu') {
-        this.analysis.suggested_action = 'Please rephrase using: create, modify, search, or delete.';
-        this.analysis.example_query = 'Example: "I want to create an objective"';
-      } else if (intentValue === 'help') {
-        this.analysis.suggested_action = 'Please specify what you need help with.';
-        this.analysis.example_query = 'Example: "How do I create an objective?"';
-      } else {
-        this.analysis.suggested_action = 'Please rephrase your request more clearly.';
-        this.analysis.example_query = 'Example: "I want to create an objective"';
-      }
-    }
+  // Check if intent was rejected due to negation, question, or weak intent
+  if (intentStatus === 'Not Clear') {
+    this.analysis.finalAnalysis = this.analysis.intent.reply;
+    this.analysis.proceed_button = false;
+    this.analysis.suggested_action = 'Please rephrase your request clearly.';
+    this.analysis.example_query = 'Example: "I want to create an objective"';
+    console.log(`[STEP5] ❌ Intent was rejected: ${this.analysis.intent.reply}`);
+    return;
   }
 
+  const allValid = 
+    (intentStatus === 'Clear' || intentStatus === 'Adequate Clarity') &&
+    (actionStatus === 'Clear' || actionStatus === 'Adequate Clarity' || actionStatus === 'Not Applicable') &&
+    (filterStatus === 'Clear' || filterStatus === 'Adequate Clarity' || filterStatus === 'Not Applicable' || filterStatus === 'Not Found');
+
+  if (allValid) {
+    if (intentValue === 'greeting') {
+      this.analysis.finalAnalysis = "Hello! I'm here to assist you today. How can I help?";
+    } else {
+      let filterText = '';
+      if (filterStatus === 'Clear' || filterStatus === 'Adequate Clarity') {
+        const filterDescriptions = this.analysis.filters.value.map(f => `${f.name} ${f.operator} ${f.value}`).join(', ');
+        filterText = ` with filters: ${filterDescriptions}`;
+      }
+      this.analysis.finalAnalysis = `Your intent is clear to ${actionValue} on ${processValue}${filterText}.`;
+    }
+    this.analysis.proceed_button = true;
+    console.log(`[STEP5] ✅ Analysis successful`);
+  } else {
+    let failures = [];
+    if (intentStatus !== 'Clear' && intentStatus !== 'Adequate Clarity') failures.push('intent');
+    if (processStatus !== 'Clear' && processStatus !== 'Adequate Clarity' && intentValue !== 'greeting') failures.push('process');
+    if (actionStatus !== 'Clear' && actionStatus !== 'Adequate Clarity' && actionStatus !== 'Not Applicable') failures.push('action');
+    if (filterStatus === 'Not Clear') failures.push('filters');
+    this.analysis.finalAnalysis = `Unable to determine: ${failures.join(', ')}.`;
+    this.analysis.proceed_button = false;
+    console.log(`[STEP5] ❌ Analysis incomplete - failures: ${failures.join(', ')}`);
+
+    if (intentValue === 'menu') {
+      this.analysis.suggested_action = 'Please rephrase using: create, modify, search, or delete.';
+      this.analysis.example_query = 'Example: "I want to create an objective"';
+    } else if (intentValue === 'help') {
+      this.analysis.suggested_action = 'Please specify what you need help with.';
+      this.analysis.example_query = 'Example: "How do I create an objective?"';
+    } else {
+      this.analysis.suggested_action = 'Please rephrase your request more clearly.';
+      this.analysis.example_query = 'Example: "I want to create an objective"';
+    }
+  }
+}
   async analyze(userInput) {
     console.log(`\n${'='.repeat(80)}`);
     console.log(`NEW ANALYSIS REQUEST: "${userInput}"`);
