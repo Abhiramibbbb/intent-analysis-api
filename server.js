@@ -730,8 +730,13 @@ class ConversationAnalyzer {
     let processFound = false;
     console.log(`\n[STEP2] Process Detection Start`);
 
-    // Check dictionary first
-    for (const [process, patterns] of Object.entries(PROCESS_DICTIONARY)) {
+    // Check dictionary first - ORDER MATTERS! Check longest phrases first
+    const processOrder = ['key result checkin', 'review meeting', 'key result', 'initiative', 'objective'];
+    
+    for (const process of processOrder) {
+      if (!PROCESS_DICTIONARY[process]) continue;
+      
+      const patterns = PROCESS_DICTIONARY[process];
       for (const keyword of [...patterns.primary, ...patterns.synonyms]) {
         if (input === keyword.toLowerCase() || input.includes(keyword.toLowerCase())) {
           this.analysis.process = { status: 'Clear', value: process, reply: `Detected process: ${process}` };
